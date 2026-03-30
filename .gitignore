@@ -1,0 +1,21 @@
+# Credenciales y Secretos
+*.json
+!requirements.txt
+
+# Ignorar específicamente la cuenta de servicio y tokens
+manuel-hernandez-*.json
+token_*.json
+client_secrets.json
+
+# Archivos temporales de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+env/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
