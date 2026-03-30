@@ -30,6 +30,9 @@ def conectar_google_sheets():
     # Intentar primero con Secrets (Nube)
     if "gcp_service_account" in st.secrets:
         creds_info = dict(st.secrets["gcp_service_account"])
+        # Limpieza de private_key para evitar errores de formato en TOML
+        if "private_key" in creds_info:
+            creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
         creds = Credentials.from_service_account_info(creds_info, scopes=scope)
     # Si no, usar archivo local
     elif os.path.exists(FILE_JSON_SERVICE):
