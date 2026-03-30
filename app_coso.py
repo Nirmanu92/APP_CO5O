@@ -30,9 +30,21 @@ def conectar_google_sheets():
     # Intentar primero con Secrets (Nube)
     if "gcp_service_account" in st.secrets:
         try:
-            # Leer el JSON completo como texto para evitar errores de formato
-            creds_json = st.secrets["gcp_service_account"]["json_key"]
-            creds_info = json.loads(creds_json)
+            sec = st.secrets["gcp_service_account"]
+            # Si el usuario pegó el JSON completo como un bloque de texto
+            if isinstance(sec, str):
+                creds_info = json.loads(sec)
+            # Si el usuario pegó el JSON dentro de una subllave 'json_key'
+            elif "json_key" in sec:
+                creds_info = json.loads(sec["json_key"])
+            # Si Streamlit lo interpretó como un diccionario (formato antiguo)
+            else:
+                creds_info = dict(sec)
+            
+            # Limpieza de seguridad para la llave privada
+            if "private_key" in creds_info:
+                creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+                
             creds = Credentials.from_service_account_info(creds_info, scopes=scope)
         except Exception as e:
             st.error(f"Error con las credenciales de la nube: {e}")
@@ -51,11 +63,17 @@ def autenticar_usuario_oauth():
     """Ejecuta el flujo de OAuth2."""
     SCOPES = ["https://www.googleapis.com/auth/drive"]
     
-    # Intentar obtener info del cliente desde Secrets o archivo
     client_config = None
+    # Intentar obtener info del cliente desde Secrets
     if "google_oauth" in st.secrets:
         try:
-            client_config = json.loads(st.secrets["google_oauth"]["json_key"])
+            sec = st.secrets["google_oauth"]
+            if isinstance(sec, str):
+                client_config = json.loads(sec)
+            elif "json_key" in sec:
+                client_config = json.loads(sec["json_key"])
+            else:
+                client_config = dict(sec)
         except: pass
     
     if not client_config and os.path.exists("client_secrets.json"):
