@@ -29,11 +29,14 @@ def conectar_google_sheets():
     
     # Intentar primero con Secrets (Nube)
     if "gcp_service_account" in st.secrets:
-        creds_info = dict(st.secrets["gcp_service_account"])
-        # Limpieza de private_key para evitar errores de formato en TOML
-        if "private_key" in creds_info:
-            creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-        creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+        try:
+            # Leer el JSON completo como texto para evitar errores de formato
+            creds_json = st.secrets["gcp_service_account"]["json_key"]
+            creds_info = json.loads(creds_json)
+            creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+        except Exception as e:
+            st.error(f"Error con las credenciales de la nube: {e}")
+            return None
     # Si no, usar archivo local
     elif os.path.exists(FILE_JSON_SERVICE):
         creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
@@ -51,8 +54,11 @@ def autenticar_usuario_oauth():
     # Intentar obtener info del cliente desde Secrets o archivo
     client_config = None
     if "google_oauth" in st.secrets:
-        client_config = dict(st.secrets["google_oauth"])
-    elif os.path.exists("client_secrets.json"):
+        try:
+            client_config = json.loads(st.secrets["google_oauth"]["json_key"])
+        except: pass
+    
+    if not client_config and os.path.exists("client_secrets.json"):
         with open("client_secrets.json", "r") as f:
             client_config = json.load(f)
     
