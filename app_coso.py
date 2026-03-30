@@ -30,18 +30,10 @@ def conectar_google_sheets():
     # Intentar primero con Secrets (Nube)
     if "gcp_service_account" in st.secrets:
         try:
-            sec = st.secrets["gcp_service_account"]
-            # Si el usuario pegó el JSON completo como un bloque de texto
-            if isinstance(sec, str):
-                creds_info = json.loads(sec)
-            # Si el usuario pegó el JSON dentro de una subllave 'json_key'
-            elif "json_key" in sec:
-                creds_info = json.loads(sec["json_key"])
-            # Si Streamlit lo interpretó como un diccionario (formato antiguo)
-            else:
-                creds_info = dict(sec)
+            # Convertir directamente el objeto de Secrets a un diccionario común
+            creds_info = dict(st.secrets["gcp_service_account"])
             
-            # Limpieza de seguridad para la llave privada
+            # Limpiar la llave privada si viene con el texto "\n" literal o saltos reales
             if "private_key" in creds_info:
                 creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
                 
@@ -67,13 +59,11 @@ def autenticar_usuario_oauth():
     # Intentar obtener info del cliente desde Secrets
     if "google_oauth" in st.secrets:
         try:
-            sec = st.secrets["google_oauth"]
-            if isinstance(sec, str):
-                client_config = json.loads(sec)
-            elif "json_key" in sec:
-                client_config = json.loads(sec["json_key"])
+            # Intentar leer el bloque completo de OAuth
+            if "installed" in st.secrets["google_oauth"]:
+                client_config = {"installed": dict(st.secrets["google_oauth"]["installed"])}
             else:
-                client_config = dict(sec)
+                client_config = {"installed": dict(st.secrets["google_oauth"])}
         except: pass
     
     if not client_config and os.path.exists("client_secrets.json"):
