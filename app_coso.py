@@ -30,22 +30,34 @@ def conectar_google_sheets():
     # Intentar primero con Secrets (Nube)
     if "gcp_service_account" in st.secrets:
         try:
-            # Convertir directamente el objeto de Secrets a un diccionario común
-            creds_info = dict(st.secrets["gcp_service_account"])
+            sec = st.secrets["gcp_service_account"]
+            creds_info = {}
             
-            # Limpiar la llave privada si viene con el texto "\n" literal o saltos reales
+            # Caso 1: El usuario pegó el JSON completo como un bloque de texto
+            if isinstance(sec, str):
+                try:
+                    creds_info = json.loads(sec)
+                except:
+                    st.error("El formato del secreto gcp_service_account no es un JSON válido.")
+                    return None
+            # Caso 2: Es un objeto tipo diccionario (TOML section)
+            else:
+                creds_info = {k: v for k, v in sec.items()}
+            
+            # Limpieza crítica de la llave privada
             if "private_key" in creds_info:
+                # Arreglar saltos de línea tanto literales como reales
                 creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
                 
             creds = Credentials.from_service_account_info(creds_info, scopes=scope)
         except Exception as e:
-            st.error(f"Error con las credenciales de la nube: {e}")
+            st.error(f"Error procesando credenciales: {e}")
             return None
     # Si no, usar archivo local
     elif os.path.exists(FILE_JSON_SERVICE):
         creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
     else:
-        st.error("No se encontraron credenciales de Google Sheets (Service Account).")
+        st.error("No se encontraron credenciales de Google Sheets.")
         return None
         
     return gspread.authorize(creds)
@@ -56,14 +68,17 @@ def autenticar_usuario_oauth():
     SCOPES = ["https://www.googleapis.com/auth/drive"]
     
     client_config = None
-    # Intentar obtener info del cliente desde Secrets
     if "google_oauth" in st.secrets:
         try:
-            # Intentar leer el bloque completo de OAuth
-            if "installed" in st.secrets["google_oauth"]:
-                client_config = {"installed": dict(st.secrets["google_oauth"]["installed"])}
+            sec = st.secrets["google_oauth"]
+            if isinstance(sec, str):
+                client_config = json.loads(sec)
             else:
-                client_config = {"installed": dict(st.secrets["google_oauth"])}
+                # Soporte para formato anidado 'installed' o directo
+                if "installed" in sec:
+                    client_config = {"installed": {k: v for k, v in sec["installed"].items()}}
+                else:
+                    client_config = {"installed": {k: v for k, v in sec.items()}}
         except: pass
     
     if not client_config and os.path.exists("client_secrets.json"):
