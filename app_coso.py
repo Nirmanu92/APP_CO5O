@@ -30,28 +30,19 @@ def conectar_google_sheets():
     # Intentar primero con Secrets (Nube)
     if "gcp_service_account" in st.secrets:
         try:
-            sec = st.secrets["gcp_service_account"]
-            creds_info = {}
+            # Leer directamente del diccionario de secretos de Streamlit
+            creds_dict = {}
+            for key in ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]:
+                if key in st.secrets["gcp_service_account"]:
+                    creds_dict[key] = st.secrets["gcp_service_account"][key]
             
-            # Caso 1: El usuario pegó el JSON completo como un bloque de texto
-            if isinstance(sec, str):
-                try:
-                    creds_info = json.loads(sec)
-                except:
-                    st.error("El formato del secreto gcp_service_account no es un JSON válido.")
-                    return None
-            # Caso 2: Es un objeto tipo diccionario (TOML section)
-            else:
-                creds_info = {k: v for k, v in sec.items()}
+            # Limpieza básica de la llave
+            if "private_key" in creds_dict:
+                creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
             
-            # Limpieza crítica de la llave privada
-            if "private_key" in creds_info:
-                # Arreglar saltos de línea tanto literales como reales
-                creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-                
-            creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         except Exception as e:
-            st.error(f"Error procesando credenciales: {e}")
+            st.error(f"Error con secretos de la nube: {e}")
             return None
     # Si no, usar archivo local
     elif os.path.exists(FILE_JSON_SERVICE):
@@ -70,15 +61,9 @@ def autenticar_usuario_oauth():
     client_config = None
     if "google_oauth" in st.secrets:
         try:
-            sec = st.secrets["google_oauth"]
-            if isinstance(sec, str):
-                client_config = json.loads(sec)
-            else:
-                # Soporte para formato anidado 'installed' o directo
-                if "installed" in sec:
-                    client_config = {"installed": {k: v for k, v in sec["installed"].items()}}
-                else:
-                    client_config = {"installed": {k: v for k, v in sec.items()}}
+            # Formato compatible con lo que Streamlit espera para OAuth
+            oauth_data = dict(st.secrets["google_oauth"])
+            client_config = {"installed": oauth_data}
         except: pass
     
     if not client_config and os.path.exists("client_secrets.json"):
