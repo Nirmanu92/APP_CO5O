@@ -73,18 +73,24 @@ def cargar_usuarios_login():
             st.error(f"Acceso denegado a la lista de usuarios: {e}")
             st.stop()
 
+# --- ALMACÉN GLOBAL DE OAUTH (Para que sobreviva al reinicio de sesión en la nube) ---
+@st.cache_resource
+def obtener_almacen_oauth():
+    return {} # Diccionario persistente en el servidor
+
 # --- 2. AUTENTICACIÓN PARA DRIVE (OAUTH PERSONAL) ---
 def procesar_callback_oauth():
-    """Atrapa el regreso de Google antes de cualquier otra lógica de la App."""
+    """Atrapa el regreso de Google y recupera el verifier del almacén global."""
     query_params = st.query_params
     if "code" in query_params and "state" in query_params:
         try:
-            # Recuperar el verifier y el usuario que viajan en el 'state'
-            state_data = query_params["state"]
-            if "___" in state_data:
-                usuario_regreso, verifier = state_data.split("___", 1)
+            state_id = query_params["state"]
+            almacen = obtener_almacen_oauth()
+            
+            if state_id in almacen:
+                usuario_regreso, verifier = almacen[state_id]
                 
-                # Reconstruir el Flow para cerrar el trato con Google
+                # Reconstruir el Flow
                 client_config = None
                 if "google_oauth" in st.secrets:
                     sec = st.secrets["google_oauth"]
@@ -99,22 +105,26 @@ def procesar_callback_oauth():
                     redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app" if "google_oauth" in st.secrets else "http://localhost"
                     flow = Flow.from_client_config(client_config, scopes=["https://www.googleapis.com/auth/drive"], redirect_uri=redirect_uri)
                     
+                    # Cerrar el trato con el verifier original recuperado del almacén
                     flow.fetch_token(code=query_params["code"], code_verifier=verifier)
                     creds = flow.credentials
                     
-                    # GUARDAR EL TOKEN PARA ESE USUARIO
+                    # Guardar el token
                     with open(f"token_{usuario_regreso}.json", 'w') as token:
                         token.write(creds.to_json())
+                    
+                    # Limpiar el almacén para seguridad
+                    del almacen[state_id]
                     
                     st.success(f"¡Drive de {usuario_regreso} conectado! Refrescando...")
                     st.query_params.clear()
                     time.sleep(2)
                     st.rerun()
         except Exception as e:
-            st.error(f"Error automático de vinculación: {e}")
+            st.error(f"Error en recepción de Google: {e}")
 
 def autenticar_usuario_oauth():
-    """Genera el botón de vinculación con los datos necesarios en el 'state'."""
+    """Genera el link de vinculación y guarda el verifier en el almacén global."""
     usuario = st.session_state.get('usuario')
     if not usuario: return
 
@@ -138,13 +148,16 @@ def autenticar_usuario_oauth():
         redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app" if "google_oauth" in st.secrets else "http://localhost"
         flow = Flow.from_client_config(client_config, scopes=["https://www.googleapis.com/auth/drive"], redirect_uri=redirect_uri)
         
-        # EL TRUCO: Meter usuario y verifier en el state
-        state_compuesto = f"{usuario}___{flow.code_verifier}"
-        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', state=state_compuesto)
+        # Guardar datos en el almacén global antes de ir a Google
+        state_id = f"state_{int(time.time())}_{usuario}"
+        almacen = obtener_almacen_oauth()
+        almacen[state_id] = (usuario, flow.code_verifier)
         
-        st.info("Tu cuenta requiere vinculación con Google Drive para guardar archivos.")
+        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', state=state_id)
+        
+        st.info("Tu cuenta requiere vinculación con Google Drive.")
         st.link_button("👉 VINCULAR MI GOOGLE DRIVE AHORA", auth_url, type="primary", use_container_width=True)
-        st.caption("Al terminar en Google, la vinculación se completará automáticamente.")
+        st.caption("Al terminar en Google, regresarás aquí y la vinculación se completará.")
     except Exception as e:
         st.error(f"Error al preparar link: {e}")
 
