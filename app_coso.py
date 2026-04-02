@@ -27,47 +27,56 @@ def conectar_google_sheets():
     """Conecta con Google Sheets usando Secrets de Streamlit o archivo local."""
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     
-    # Intentar primero con Secrets (Nube)
+    # 1. Intentar con Secrets (Entorno Nube)
     if "gcp_service_account" in st.secrets:
         try:
             sec = st.secrets["gcp_service_account"]
-            # Solución robusta: forzar conversión a diccionario sin importar el formato de Streamlit
-            if isinstance(sec, str):
-                try:
-                    creds_dict = json.loads(sec)
-                except:
-                    # Si no es JSON, intentar parsear como TOML si fuera posible (raro)
-                    st.error("Error: El secreto gcp_service_account no es un JSON válido.")
-                    return None
-            else:
-                # Si es un objeto de Streamlit, convertir a dict estándar
-                creds_dict = {k: v for k, v in sec.items()}
+            creds_info = dict(sec) if not isinstance(sec, str) else json.loads(sec)
             
-            # --- LIMPIEZA PROFUNDA DE LLAVE PEM ---
-            if "private_key" in creds_dict:
-                pk = creds_dict["private_key"]
-                # 1. Convertir texto "\n" literal en saltos reales
-                pk = pk.replace("\\n", "\n")
-                # 2. Eliminar espacios accidentales al inicio/final de cada línea y filtrar líneas vacías
-                lineas = [linea.strip() for linea in pk.split("\n") if linea.strip()]
-                # 3. Reconstruir la llave con el formato exacto que exige Google
-                pk_limpia = "\n".join(lineas)
-                if not pk_limpia.endswith("\n"):
-                    pk_limpia += "\n"
-                creds_dict["private_key"] = pk_limpia
+            if "private_key" in creds_info:
+                pk = str(creds_info["private_key"])
+                # --- RECONSTRUCCIÓN QUIRÚRGICA DE LLAVE PEM ---
+                # Quitar encabezados, pies, saltos de línea literales (\n) y reales (\n)
+                pk = pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
+                pk = pk.replace("\\n", "").replace("\n", "").replace(" ", "").strip()
+                
+                # Volver a armar el formato PEM exacto (Google es extremadamente estricto aquí)
+                pk_reconstruida = "-----BEGIN PRIVATE KEY-----\n"
+                for i in range(0, len(pk), 64):
+                    pk_reconstruida += pk[i:i+64] + "\n"
+                pk_reconstruida += "-----END PRIVATE KEY-----\n"
+                
+                creds_info["private_key"] = pk_reconstruida
             
-            creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+            creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+            return gspread.authorize(creds)
         except Exception as e:
-            st.error(f"Error procesando secretos de la nube: {e}")
+            st.error(f"Error procesando secretos de la nube: {str(e)}")
             return None
-    # Si no, usar archivo local
-    elif os.path.exists(FILE_JSON_SERVICE):
-        creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
-    else:
-        st.error("No se encontraron credenciales de Google Sheets.")
-        return None
-        
-    return gspread.authorize(creds)
+
+    # 2. Intentar con archivo local
+    if os.path.exists(FILE_JSON_SERVICE):
+        try:
+            creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
+            return gspread.authorize(creds)
+        except Exception as e:
+            st.error(f"Error con archivo local: {e}")
+            return None
+            
+    return None
+
+# --- CARGA SÓLO USUARIOS PARA LOGIN ---
+def cargar_usuarios_login():
+    if 'usuarios_db' not in st.session_state:
+        try:
+            gc = conectar_google_sheets()
+            if gc is None:
+                st.warning("⚠️ Esperando configuración de base de datos...")
+                st.stop()
+            st.session_state.usuarios_db = gc.open("CONTROL_USUARIOS").sheet1.get_all_records()
+        except Exception as e:
+            st.error(f"Acceso denegado a la lista de usuarios: {e}")
+            st.stop()
 
 # --- 2. AUTENTICACIÓN PARA DRIVE (OAUTH PERSONAL) ---
 def autenticar_usuario_oauth():
