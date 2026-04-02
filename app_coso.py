@@ -98,9 +98,14 @@ def autenticar_usuario_oauth():
     try:
         from google_auth_oauthlib.flow import Flow
         
-        # Determinar Redirect URI
-        is_cloud = "google_oauth" in st.secrets
-        redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app/" if is_cloud else "http://localhost"
+        # Determinar Redirect URI exacta del archivo de configuración
+        if "web" in client_config:
+            redirect_uri = client_config["web"]["redirect_uris"][0]
+        elif "installed" in client_config:
+            redirect_uri = client_config["installed"]["redirect_uris"][0]
+        else:
+            is_cloud = "google_oauth" in st.secrets
+            redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app" if is_cloud else "http://localhost"
         
         flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
         
