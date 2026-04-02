@@ -1544,13 +1544,13 @@ else:
                     cliente_sel = st.selectbox("Razón Social:", ["Seleccionar..."] + lista_rs, index=idx_rs, key="cliente_sel_widget")
                     
                     # DISPARADOR DE FOLIO AUTOMÁTICO
-                    # Si el cliente cambió y no es una edición de folio existente, generar uno nuevo
                     if cliente_sel != "Seleccionar..." and cliente_sel != st.session_state.get('cliente_sel_ant'):
-                        nuevo_folio = generar_folio_automatico(cliente_sel, st.session_state.usuario)
-                        if nuevo_folio:
-                            st.session_state.folio_val = nuevo_folio
-                            st.session_state.cliente_sel_ant = cliente_sel # Memorizar para no repetir en bucle
-                            st.rerun()
+                        with st.spinner("Calculando nuevo folio..."):
+                            nuevo_folio = generar_folio_automatico(cliente_sel, st.session_state.usuario)
+                            if nuevo_folio:
+                                st.session_state.folio_val = nuevo_folio
+                                st.session_state.cliente_sel_ant = cliente_sel
+                                st.rerun()
                     
                     st.session_state.cliente_sel = cliente_sel
                 
@@ -1569,9 +1569,9 @@ else:
                 st.divider()
                 col_f1, col_f2, col_f3 = st.columns(3)
                 with col_f1:
-                    val_folio = st.session_state.get('folio_val', "")
-                    folio = st.text_input("Folio Manual:", value=val_folio, key="folio_val_input")
-                    st.session_state.folio_val = folio 
+                    # Usar directamente st.session_state.folio_val en el widget
+                    if 'folio_val' not in st.session_state: st.session_state.folio_val = ""
+                    folio = st.text_input("Folio de Cotización:", key="folio_val")
                 with col_f3:
                     val_vigencia = st.session_state.get('vigencia_val', date.today())
                     vigencia = st.date_input("Vigencia:", value=val_vigencia, key="vigencia_val")
