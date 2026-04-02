@@ -98,7 +98,7 @@ def autenticar_usuario_oauth():
     try:
         from google_auth_oauthlib.flow import Flow
         
-        # Determinar Redirect URI exacta del archivo de configuración
+        # Determinar Redirect URI exacta
         if "web" in client_config:
             redirect_uri = client_config["web"]["redirect_uris"][0]
         elif "installed" in client_config:
@@ -114,8 +114,10 @@ def autenticar_usuario_oauth():
         if "code" in query_params:
             try:
                 code = query_params["code"]
-                # Recuperar el verifier guardado en la sesión para completar el apretón de manos
-                verifier = st.session_state.get("oauth_code_verifier")
+                # RECUPERACIÓN MAESTRA: El verifier viene en el parámetro 'state' de la URL
+                # Esto es lo que permite que funcione aunque la sesión de Streamlit se reinicie
+                verifier = query_params.get("state")
+                
                 flow.fetch_token(code=code, code_verifier=verifier)
                 creds = flow.credentials
                 
@@ -125,22 +127,21 @@ def autenticar_usuario_oauth():
                     token.write(creds.to_json())
                 
                 st.success("¡Google Drive vinculado con éxito!")
-                if "oauth_code_verifier" in st.session_state: del st.session_state["oauth_code_verifier"]
                 st.query_params.clear() 
                 time.sleep(2)
                 st.rerun()
                 return
             except Exception as e:
-                st.error(f"Error al procesar el código de Google: {e}")
+                st.error(f"Error al procesar la vinculación: {e}")
+                st.info("Intenta hacer clic en el botón de vinculación nuevamente.")
 
         # MOSTRAR BOTÓN DE VINCULACIÓN
-        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
-        # GUARDAR EL VERIFIER: Esto es lo que evita el error 'Missing code verifier'
-        st.session_state["oauth_code_verifier"] = flow.code_verifier
+        # Generamos la URL y usamos el propio verifier como 'state' para que Google nos lo devuelva
+        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', state=flow.code_verifier)
         
         st.info("Tu cuenta requiere vinculación con Google Drive para guardar archivos.")
         st.link_button("👉 VINCULAR MI GOOGLE DRIVE AHORA", auth_url, type="primary", use_container_width=True)
-        st.caption("Nota: Al hacer clic, irás a Google y luego serás regresado aquí.")
+        st.caption("Nota: Al autorizar, Google te regresará aquí. Si te pide login de nuevo, ingresa y la vinculación se completará sola.")
 
     except Exception as e:
         st.error(f"Error al preparar la vinculación: {e}")
