@@ -75,7 +75,7 @@ def cargar_usuarios_login():
 
 # --- 2. AUTENTICACIÓN PARA DRIVE (OAUTH PERSONAL) ---
 def autenticar_usuario_oauth():
-    """Ejecuta el flujo de OAuth2."""
+    """Ejecuta el flujo de OAuth2 compatible con Local y Nube."""
     SCOPES = ["https://www.googleapis.com/auth/drive"]
     
     client_config = None
@@ -83,6 +83,7 @@ def autenticar_usuario_oauth():
         try:
             sec = st.secrets["google_oauth"]
             oauth_data = dict(sec) if not isinstance(sec, str) else json.loads(sec)
+            # Asegurar estructura 'web'
             client_config = oauth_data if "web" in oauth_data or "installed" in oauth_data else {"web": oauth_data}
         except: pass
     
@@ -95,25 +96,46 @@ def autenticar_usuario_oauth():
         return
 
     try:
-        from google_auth_oauthlib.flow import InstalledAppFlow
-        flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
+        from google_auth_oauthlib.flow import Flow
         
-        # En la nube usamos el puerto 0 para redirección web
-        creds = flow.run_local_server(port=0)
+        # Determinar Redirect URI
+        is_cloud = "google_oauth" in st.secrets
+        redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app/" if is_cloud else "http://localhost"
         
-        usuario = st.session_state.usuario
-        token_file = f"token_{usuario}.json"
-        with open(token_file, 'w') as token:
-            token.write(creds.to_json())
+        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
         
-        st.success("¡Cuenta vinculada con éxito! Reiniciando...")
-        time.sleep(2)
-        st.rerun()
+        # PROCESO DE RECEPCIÓN DEL CÓDIGO (POST-AUTORIZACIÓN)
+        query_params = st.query_params
+        if "code" in query_params:
+            try:
+                code = query_params["code"]
+                flow.fetch_token(code=code)
+                creds = flow.credentials
+                
+                usuario = st.session_state.usuario
+                token_file = f"token_{usuario}.json"
+                with open(token_file, 'w') as token:
+                    token.write(creds.to_json())
+                
+                st.success("¡Google Drive vinculado con éxito!")
+                st.query_params.clear() 
+                time.sleep(2)
+                st.rerun()
+                return
+            except Exception as e:
+                st.error(f"Error al procesar el código de Google: {e}")
+
+        # MOSTRAR BOTÓN DE VINCULACIÓN
+        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
+        st.info("Tu cuenta requiere vinculación con Google Drive para guardar archivos.")
+        st.link_button("👉 VINCULAR MI GOOGLE DRIVE AHORA", auth_url, type="primary", use_container_width=True)
+        st.caption("Nota: Al hacer clic, irás a Google y luego serás regresado aquí.")
+
     except Exception as e:
-        st.error(f"Error en el proceso de vinculación: {e}")
+        st.error(f"Error al preparar la vinculación: {e}")
 
 def obtener_drive_service():
-    """Retorna el servicio de Drive usando el token personal del usuario."""
+    """Retorna el servicio de Drive manejando errores de forma silenciosa para la UI."""
     usuario = st.session_state.get('usuario')
     if not usuario: return None
     token_file = f"token_{usuario}.json"
@@ -122,11 +144,15 @@ def obtener_drive_service():
         try:
             creds = UserCredentials.from_authorized_user_file(token_file, ["https://www.googleapis.com/auth/drive"])
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-                with open(token_file, 'w') as tf: tf.write(creds.to_json())
+                try:
+                    creds.refresh(Request())
+                    with open(token_file, 'w') as tf: tf.write(creds.to_json())
+                except:
+                    # Si el refresco falla, el token ya no sirve
+                    os.remove(token_file)
+                    return None
             return build('drive', 'v3', credentials=creds)
-        except Exception as e:
-            st.session_state.drive_error_msg = str(e)
+        except:
             return None
     return None
 
@@ -1039,9 +1065,8 @@ else:
 
         # Botón de vinculación de Drive si falla el token
         if not obtener_drive_service():
-            st.warning("⚠️ Tu conexión con Google Drive ha expirado o no se encuentra.")
-            if st.button("VINCULAR MI GOOGLE DRIVE AHORA", type="primary", use_container_width=True):
-                autenticar_usuario_oauth()
+            st.warning("⚠️ CONEXIÓN DE DRIVE PENDIENTE")
+            autenticar_usuario_oauth()
             st.divider()
 
         # --- VISTA: DASHBOARD PRINCIPAL (HOME) ---
