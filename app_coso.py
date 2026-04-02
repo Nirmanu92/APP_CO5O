@@ -35,23 +35,18 @@ def conectar_google_sheets():
             
             if "private_key" in creds_info:
                 pk = str(creds_info["private_key"])
-                # --- RECONSTRUCCIÓN QUIRÚRGICA DE LLAVE PEM ---
-                # Quitar encabezados, pies, saltos de línea literales (\n) y reales (\n)
+                # RECONSTRUCCIÓN DE LLAVE PEM (Evita errores de formato de Streamlit)
                 pk = pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
                 pk = pk.replace("\\n", "").replace("\n", "").replace(" ", "").strip()
-                
-                # Volver a armar el formato PEM exacto (Google es extremadamente estricto aquí)
-                pk_reconstruida = "-----BEGIN PRIVATE KEY-----\n"
-                for i in range(0, len(pk), 64):
-                    pk_reconstruida += pk[i:i+64] + "\n"
-                pk_reconstruida += "-----END PRIVATE KEY-----\n"
-                
-                creds_info["private_key"] = pk_reconstruida
+                pk_clean = "-----BEGIN PRIVATE KEY-----\n"
+                for i in range(0, len(pk), 64): pk_clean += pk[i:i+64] + "\n"
+                pk_clean += "-----END PRIVATE KEY-----\n"
+                creds_info["private_key"] = pk_clean
             
             creds = Credentials.from_service_account_info(creds_info, scopes=scope)
             return gspread.authorize(creds)
         except Exception as e:
-            st.error(f"Error procesando secretos de la nube: {str(e)}")
+            st.error(f"Error técnico en la nube: {str(e)}")
             return None
 
     # 2. Intentar con archivo local
@@ -87,18 +82,8 @@ def autenticar_usuario_oauth():
     if "google_oauth" in st.secrets:
         try:
             sec = st.secrets["google_oauth"]
-            if isinstance(sec, str):
-                oauth_data = json.loads(sec)
-            else:
-                oauth_data = {k: v for k, v in sec.items()}
-            
-            # Si el JSON viene con la etiqueta 'web' o 'installed' dentro, o es plano
-            if "web" in oauth_data:
-                client_config = oauth_data
-            elif "installed" in oauth_data:
-                client_config = oauth_data
-            else:
-                client_config = {"installed": oauth_data}
+            oauth_data = dict(sec) if not isinstance(sec, str) else json.loads(sec)
+            client_config = oauth_data if "web" in oauth_data or "installed" in oauth_data else {"web": oauth_data}
         except: pass
     
     if not client_config and os.path.exists("client_secrets.json"):
@@ -113,8 +98,7 @@ def autenticar_usuario_oauth():
         from google_auth_oauthlib.flow import InstalledAppFlow
         flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
         
-        # ATENCIÓN: run_local_server solo funciona localmente. 
-        # En la nube, esto fallará hasta configurar el Redirect URI.
+        # En la nube usamos el puerto 0 para redirección web
         creds = flow.run_local_server(port=0)
         
         usuario = st.session_state.usuario
