@@ -75,7 +75,7 @@ def cargar_usuarios_login():
 
 # --- 2. AUTENTICACIÓN PARA DRIVE (OAUTH PERSONAL) ---
 def procesar_callback_oauth():
-    """Intercambio manual de código por token para evitar errores de PKCE/Verifier."""
+    """Intercambio de código por token y guardado persistente en Sheets."""
     query_params = st.query_params
     if "code" in query_params and "state" in query_params:
         try:
@@ -96,7 +96,6 @@ def procesar_callback_oauth():
 
             if client_config:
                 import requests
-                # PETICIÓN DIRECTA A GOOGLE (Sin librerías intermedias que fallen)
                 token_url = client_config.get("token_uri", "https://oauth2.googleapis.com/token")
                 redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app" if "google_oauth" in st.secrets else "http://localhost"
                 
@@ -112,16 +111,31 @@ def procesar_callback_oauth():
                 token_data = res.json()
                 
                 if "access_token" in token_data:
-                    # Guardar el token en el formato que espera Google Auth
-                    with open(f"token_{usuario_regreso}.json", 'w') as f:
-                        json.dump(token_data, f)
+                    # Enriquecer token con datos del cliente para que sea compatible con la librería
+                    token_data["client_id"] = client_config['client_id']
+                    token_data["client_secret"] = client_config['client_secret']
                     
-                    st.success(f"¡Drive de {usuario_regreso} conectado!")
+                    # --- GUARDADO PERSISTENTE EN GOOGLE SHEETS ---
+                    gc = conectar_google_sheets()
+                    ws_users = gc.open("CONTROL_USUARIOS").sheet1
+                    usuarios_list = ws_users.col_values(1) # Asumiendo columna 1 es USUARIO
+                    
+                    if usuario_regreso in usuarios_list:
+                        fila_idx = usuarios_list.index(usuario_regreso) + 1
+                        # Buscar o crear columna TOKEN
+                        headers = ws_users.row_values(1)
+                        if "TOKEN_DRIVE" not in headers:
+                            ws_users.update_cell(1, len(headers) + 1, "TOKEN_DRIVE")
+                            col_idx = len(headers) + 1
+                        else:
+                            col_idx = headers.index("TOKEN_DRIVE") + 1
+                        
+                        ws_users.update_cell(fila_idx, col_idx, json.dumps(token_data))
+                    
+                    st.success(f"¡Drive de {usuario_regreso} conectado con éxito!")
                     st.query_params.clear()
                     time.sleep(2)
                     st.rerun()
-                else:
-                    st.error(f"Google no entregó el permiso: {token_data.get('error_description', 'Error desconocido')}")
         except Exception as e:
             st.error(f"Error técnico en vinculación: {e}")
 
@@ -151,7 +165,6 @@ def autenticar_usuario_oauth():
         redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app" if "google_oauth" in st.secrets else "http://localhost"
         scopes = "https://www.googleapis.com/auth/drive"
         
-        # Construir URL a mano para evitar que la librería fuerce el 'code_verifier'
         auth_url = (
             f"{auth_uri}?client_id={client_config['client_id']}"
             f"&redirect_uri={redirect_uri}"
@@ -164,30 +177,35 @@ def autenticar_usuario_oauth():
         
         st.info("Tu cuenta requiere vinculación con Google Drive.")
         st.link_button("👉 VINCULAR MI GOOGLE DRIVE AHORA", auth_url, type="primary", use_container_width=True)
-        st.caption("Nota: Al autorizar, Google te regresará aquí para completar el proceso.")
+        st.caption("Al terminar en Google, regresarás aquí y tu permiso se guardará en la nube.")
     except Exception as e:
         st.error(f"Error al preparar link: {e}")
 
 def obtener_drive_service():
-    """Retorna el servicio de Drive manejando errores de forma silenciosa para la UI."""
+    """Retorna el servicio de Drive leyendo el token desde Google Sheets."""
     usuario = st.session_state.get('usuario')
-    if not usuario: return None
-    token_file = f"token_{usuario}.json"
+    if not usuario or 'usuarios_db' not in st.session_state: return None
     
-    if os.path.exists(token_file):
-        try:
-            creds = UserCredentials.from_authorized_user_file(token_file, ["https://www.googleapis.com/auth/drive"])
+    try:
+        # Buscar token en los datos cargados del usuario
+        datos_user = next((u for u in st.session_state.usuarios_db if u['USUARIO'] == usuario), None)
+        token_json = datos_user.get('TOKEN_DRIVE')
+        
+        if token_json:
+            token_data = json.loads(token_json)
+            # Reconstruir credenciales
+            creds = UserCredentials.from_authorized_user_info(token_data, ["https://www.googleapis.com/auth/drive"])
+            
             if creds and creds.expired and creds.refresh_token:
                 try:
                     creds.refresh(Request())
-                    with open(token_file, 'w') as tf: tf.write(creds.to_json())
-                except:
-                    # Si el refresco falla, el token ya no sirve
-                    os.remove(token_file)
-                    return None
+                    # Opcional: Actualizar el token en el sheet si se refrescó (para la próxima vez)
+                except: pass
+            
             return build('drive', 'v3', credentials=creds)
-        except:
-            return None
+    except Exception as e:
+        # st.write(f"Debug Drive: {e}") # Descomentar para ver errores de conexión
+        return None
     return None
 
 # --- CONFIGURACIÓN UI ---
