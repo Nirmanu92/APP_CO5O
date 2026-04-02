@@ -73,91 +73,98 @@ def cargar_usuarios_login():
             st.error(f"Acceso denegado a la lista de usuarios: {e}")
             st.stop()
 
-# --- ALMACÉN GLOBAL DE OAUTH (Para que sobreviva al reinicio de sesión en la nube) ---
-@st.cache_resource
-def obtener_almacen_oauth():
-    return {} # Diccionario persistente en el servidor
-
 # --- 2. AUTENTICACIÓN PARA DRIVE (OAUTH PERSONAL) ---
 def procesar_callback_oauth():
-    """Atrapa el regreso de Google y recupera el verifier del almacén global."""
+    """Intercambio manual de código por token para evitar errores de PKCE/Verifier."""
     query_params = st.query_params
     if "code" in query_params and "state" in query_params:
         try:
-            state_id = query_params["state"]
-            almacen = obtener_almacen_oauth()
+            usuario_regreso = query_params["state"]
+            code = query_params["code"]
             
-            if state_id in almacen:
-                usuario_regreso, verifier = almacen[state_id]
+            # Obtener configuración
+            client_config = None
+            if "google_oauth" in st.secrets:
+                sec = st.secrets["google_oauth"]
+                oauth_data = dict(sec) if not isinstance(sec, str) else json.loads(sec)
+                client_config = oauth_data.get("web") or oauth_data.get("installed") or oauth_data
+            
+            if not client_config and os.path.exists("client_secrets.json"):
+                with open("client_secrets.json", "r") as f:
+                    js = json.load(f)
+                    client_config = js.get("web") or js.get("installed") or js
+
+            if client_config:
+                import requests
+                # PETICIÓN DIRECTA A GOOGLE (Sin librerías intermedias que fallen)
+                token_url = client_config.get("token_uri", "https://oauth2.googleapis.com/token")
+                redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app" if "google_oauth" in st.secrets else "http://localhost"
                 
-                # Reconstruir el Flow
-                client_config = None
-                if "google_oauth" in st.secrets:
-                    sec = st.secrets["google_oauth"]
-                    oauth_data = dict(sec) if not isinstance(sec, str) else json.loads(sec)
-                    client_config = oauth_data if "web" in oauth_data or "installed" in oauth_data else {"web": oauth_data}
+                data = {
+                    'code': code,
+                    'client_id': client_config['client_id'],
+                    'client_secret': client_config['client_secret'],
+                    'redirect_uri': redirect_uri,
+                    'grant_type': 'authorization_code'
+                }
                 
-                if not client_config and os.path.exists("client_secrets.json"):
-                    with open("client_secrets.json", "r") as f: client_config = json.load(f)
+                res = requests.post(token_url, data=data)
+                token_data = res.json()
                 
-                if client_config:
-                    from google_auth_oauthlib.flow import Flow
-                    redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app" if "google_oauth" in st.secrets else "http://localhost"
-                    flow = Flow.from_client_config(client_config, scopes=["https://www.googleapis.com/auth/drive"], redirect_uri=redirect_uri)
+                if "access_token" in token_data:
+                    # Guardar el token en el formato que espera Google Auth
+                    with open(f"token_{usuario_regreso}.json", 'w') as f:
+                        json.dump(token_data, f)
                     
-                    # Cerrar el trato con el verifier original recuperado del almacén
-                    flow.fetch_token(code=query_params["code"], code_verifier=verifier)
-                    creds = flow.credentials
-                    
-                    # Guardar el token
-                    with open(f"token_{usuario_regreso}.json", 'w') as token:
-                        token.write(creds.to_json())
-                    
-                    # Limpiar el almacén para seguridad
-                    del almacen[state_id]
-                    
-                    st.success(f"¡Drive de {usuario_regreso} conectado! Refrescando...")
+                    st.success(f"¡Drive de {usuario_regreso} conectado!")
                     st.query_params.clear()
                     time.sleep(2)
                     st.rerun()
+                else:
+                    st.error(f"Google no entregó el permiso: {token_data.get('error_description', 'Error desconocido')}")
         except Exception as e:
-            st.error(f"Error en recepción de Google: {e}")
+            st.error(f"Error técnico en vinculación: {e}")
 
 def autenticar_usuario_oauth():
-    """Genera el link de vinculación y guarda el verifier en el almacén global."""
+    """Genera el link de autorización manual."""
     usuario = st.session_state.get('usuario')
     if not usuario: return
 
+    # Obtener configuración
     client_config = None
     if "google_oauth" in st.secrets:
-        try:
-            sec = st.secrets["google_oauth"]
-            oauth_data = dict(sec) if not isinstance(sec, str) else json.loads(sec)
-            client_config = oauth_data if "web" in oauth_data or "installed" in oauth_data else {"web": oauth_data}
-        except: pass
+        sec = st.secrets["google_oauth"]
+        oauth_data = dict(sec) if not isinstance(sec, str) else json.loads(sec)
+        client_config = oauth_data.get("web") or oauth_data.get("installed") or oauth_data
     
     if not client_config and os.path.exists("client_secrets.json"):
-        with open("client_secrets.json", "r") as f: client_config = json.load(f)
+        with open("client_secrets.json", "r") as f:
+            js = json.load(f)
+            client_config = js.get("web") or js.get("installed") or js
 
     if not client_config:
-        st.error("Falta configuración de Google Drive.")
+        st.error("Falta configuración de Drive.")
         return
 
     try:
-        from google_auth_oauthlib.flow import Flow
+        auth_uri = client_config.get("auth_uri", "https://accounts.google.com/o/oauth2/auth")
         redirect_uri = "https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app" if "google_oauth" in st.secrets else "http://localhost"
-        flow = Flow.from_client_config(client_config, scopes=["https://www.googleapis.com/auth/drive"], redirect_uri=redirect_uri)
+        scopes = "https://www.googleapis.com/auth/drive"
         
-        # Guardar datos en el almacén global antes de ir a Google
-        state_id = f"state_{int(time.time())}_{usuario}"
-        almacen = obtener_almacen_oauth()
-        almacen[state_id] = (usuario, flow.code_verifier)
-        
-        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', state=state_id)
+        # Construir URL a mano para evitar que la librería fuerce el 'code_verifier'
+        auth_url = (
+            f"{auth_uri}?client_id={client_config['client_id']}"
+            f"&redirect_uri={redirect_uri}"
+            f"&scope={scopes}"
+            f"&response_type=code"
+            f"&access_type=offline"
+            f"&prompt=consent"
+            f"&state={usuario}"
+        )
         
         st.info("Tu cuenta requiere vinculación con Google Drive.")
         st.link_button("👉 VINCULAR MI GOOGLE DRIVE AHORA", auth_url, type="primary", use_container_width=True)
-        st.caption("Al terminar en Google, regresarás aquí y la vinculación se completará.")
+        st.caption("Nota: Al autorizar, Google te regresará aquí para completar el proceso.")
     except Exception as e:
         st.error(f"Error al preparar link: {e}")
 
