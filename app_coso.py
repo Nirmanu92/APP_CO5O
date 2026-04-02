@@ -114,7 +114,9 @@ def autenticar_usuario_oauth():
         if "code" in query_params:
             try:
                 code = query_params["code"]
-                flow.fetch_token(code=code)
+                # Recuperar el verifier guardado en la sesión para completar el apretón de manos
+                verifier = st.session_state.get("oauth_code_verifier")
+                flow.fetch_token(code=code, code_verifier=verifier)
                 creds = flow.credentials
                 
                 usuario = st.session_state.usuario
@@ -123,6 +125,7 @@ def autenticar_usuario_oauth():
                     token.write(creds.to_json())
                 
                 st.success("¡Google Drive vinculado con éxito!")
+                if "oauth_code_verifier" in st.session_state: del st.session_state["oauth_code_verifier"]
                 st.query_params.clear() 
                 time.sleep(2)
                 st.rerun()
@@ -132,6 +135,9 @@ def autenticar_usuario_oauth():
 
         # MOSTRAR BOTÓN DE VINCULACIÓN
         auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
+        # GUARDAR EL VERIFIER: Esto es lo que evita el error 'Missing code verifier'
+        st.session_state["oauth_code_verifier"] = flow.code_verifier
+        
         st.info("Tu cuenta requiere vinculación con Google Drive para guardar archivos.")
         st.link_button("👉 VINCULAR MI GOOGLE DRIVE AHORA", auth_url, type="primary", use_container_width=True)
         st.caption("Nota: Al hacer clic, irás a Google y luego serás regresado aquí.")
