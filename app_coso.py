@@ -43,9 +43,18 @@ def conectar_google_sheets():
                 # Si es un objeto de Streamlit, convertir a dict estándar
                 creds_dict = {k: v for k, v in sec.items()}
             
-            # Limpieza básica de la llave
+            # --- LIMPIEZA PROFUNDA DE LLAVE PEM ---
             if "private_key" in creds_dict:
-                creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+                pk = creds_dict["private_key"]
+                # 1. Convertir texto "\n" literal en saltos reales
+                pk = pk.replace("\\n", "\n")
+                # 2. Eliminar espacios accidentales al inicio/final de cada línea y filtrar líneas vacías
+                lineas = [linea.strip() for linea in pk.split("\n") if linea.strip()]
+                # 3. Reconstruir la llave con el formato exacto que exige Google
+                pk_limpia = "\n".join(lineas)
+                if not pk_limpia.endswith("\n"):
+                    pk_limpia += "\n"
+                creds_dict["private_key"] = pk_limpia
             
             creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         except Exception as e:
