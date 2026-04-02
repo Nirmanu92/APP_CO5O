@@ -996,6 +996,10 @@ def cargar_cotizacion_para_editar(row, df_resumen):
     except:
         pass
 
+# --- ACTIVACIÓN DE RECEPCIÓN DE DRIVE (OAUTH) ---
+# Esta función debe correr antes de que Streamlit detenga el flujo por el Login
+procesar_callback_oauth()
+
 # --- LÓGICA DE LOGIN ---
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
