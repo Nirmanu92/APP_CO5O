@@ -209,7 +209,41 @@ def obtener_drive_service():
     return None
 
 # --- CONFIGURACIÓN UI ---
-st.set_page_config(page_title="CO5O - Registro Maestro", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="CO5O - Registro Maestro", page_icon="LOGOPURO.png", layout="wide", initial_sidebar_state="expanded")
+
+# --- GENERADOR DE FOLIO AUTOMÁTICO ---
+def generar_folio_automatico(cliente_rs, ejecutivo_id):
+    """Genera un folio con sintaxis: CLIENTE-EJECUTIVO-FECHA-SUCURSAL-CONSECUTIVO"""
+    try:
+        # 1. Siglas Cliente
+        info_c = next((c for c in st.session_state.directorio if c['RAZON_SOCIAL'] == cliente_rs), {})
+        siglas_c = str(info_c.get('SIGLAS', 'SCL')).upper()[:3]
+        
+        # 2. Siglas Ejecutivo y Sucursal
+        info_e = next((u for u in st.session_state.usuarios_db if u['USUARIO'] == ejecutivo_id), {})
+        siglas_e = str(info_e.get('SIGLAS', 'SEJ')).upper()[:3]
+        sucursal = str(info_e.get('SUCURSAL', 'MX')).upper()[:2]
+        
+        # 3. Fecha (YYMMDD)
+        fecha_str = date.today().strftime("%y%m%d")
+        
+        # 4. Consecutivo (Basado en el historial)
+        prefijo_busqueda = f"{siglas_c}-{siglas_e}-{fecha_str}-{sucursal}"
+        
+        ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
+        folios_historial = ws_res.col_values(1) # Columna FOLIO
+        
+        # Contar cuántos folios existen hoy para este ejecutivo/cliente
+        count = 1
+        for f in folios_historial:
+            if str(f).startswith(prefijo_busqueda):
+                count += 1
+        
+        consecutivo = str(count).zfill(3)
+        
+        return f"{prefijo_busqueda}-{consecutivo}"
+    except Exception as e:
+        return ""
 
 # --- ESTILO DE ALTA DEFINICIÓN (SHARPNESS) ---
 st.markdown("""
@@ -1508,6 +1542,16 @@ else:
                     lista_rs = sorted(list(set([c['RAZON_SOCIAL'] for c in st.session_state.directorio if c['RAZON_SOCIAL']])))
                     idx_rs = buscar_index(lista_rs, st.session_state.get('cliente_sel'))
                     cliente_sel = st.selectbox("Razón Social:", ["Seleccionar..."] + lista_rs, index=idx_rs, key="cliente_sel_widget")
+                    
+                    # DISPARADOR DE FOLIO AUTOMÁTICO
+                    # Si el cliente cambió y no es una edición de folio existente, generar uno nuevo
+                    if cliente_sel != "Seleccionar..." and cliente_sel != st.session_state.get('cliente_sel_ant'):
+                        nuevo_folio = generar_folio_automatico(cliente_sel, st.session_state.usuario)
+                        if nuevo_folio:
+                            st.session_state.folio_val = nuevo_folio
+                            st.session_state.cliente_sel_ant = cliente_sel # Memorizar para no repetir en bucle
+                            st.rerun()
+                    
                     st.session_state.cliente_sel = cliente_sel
                 
                 with col_c2:
