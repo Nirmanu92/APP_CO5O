@@ -1634,13 +1634,13 @@ else:
 
                 config_editor = {
                     "Tipo": st.column_config.SelectboxColumn("Tipo", options=["PARTIDA", "COMPONENTE"], required=True),
-                    "Descripción": st.column_config.TextColumn("Descripción", width="medium", required=True),
+                    "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True, width="medium"),
+                    "Financiera": st.column_config.SelectboxColumn("Financiera", options=["N/A", "DFS", "HPE", "Otro"], required=True),
+                    "Descripción": st.column_config.TextColumn("Descripción", width="large", required=True),
                     "PM": st.column_config.NumberColumn("P. Mayorista", format="$ %.2f"),
                     "Proveedor": st.column_config.SelectboxColumn("Proveedor", options=lista_prov),
                     "Util %": st.column_config.NumberColumn("Margen %", format="%.1f%%"),
                     "Pzas": st.column_config.NumberColumn("Cant", min_value=1),
-                    "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True),
-                    "Financiera": st.column_config.SelectboxColumn("Financiera", options=["N/A", "DFS", "HPE", "Otro"], required=True),
                 }
 
                 key_dinamica = f"editor_{st.session_state.get('editor_key', 0)}"
