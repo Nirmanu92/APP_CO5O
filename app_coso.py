@@ -1800,16 +1800,13 @@ else:
                     
                     st.divider()
                     if st.button("CONFIRMAR Y GUARDAR TODO", use_container_width=True, type="primary"):
-                        # ... lógica de guardado (se mantiene intacta) ...
                         if "Seleccionar..." in [ejecutivo_nom, cliente_sel, contacto_sel, entrega, pago, condic] or not st.session_state.folio_val:
                             st.error("Revisa que todos los campos obligatorios en 'Generales' estén llenos.")
                         else:
-                            # [AQUÍ VA TODA LA LÓGICA DE GUARDADO QUE YA FUNCIONA]
                             try:
                                 with st.spinner("Guardando en Sheets y Drive..."):
                                     folio_actual = st.session_state.folio_val
                                     
-                                    # 1. Subir imágenes nuevas (Ilustraciones)
                                     dict_links_drive = st.session_state.get('dict_fotos_links', {}).copy()
                                     if st.session_state.dict_fotos:
                                         for idx_f, bytes_f in st.session_state.dict_fotos.items():
@@ -1817,7 +1814,6 @@ else:
                                             link_d = subir_archivo_a_drive(bytes_f.read(), f"Partida_{folio_actual}_{idx_f}.png", 'image/png')
                                             if link_d: dict_links_drive[idx_f] = link_d
                                     
-                                    # 1.1 Subir evidencias nuevas (Documentos de respaldo)
                                     dict_evidencias_drive = st.session_state.get('dict_evidencias_links', {}).copy()
                                     if st.session_state.get('dict_evidencias'):
                                         for idx_ev, file_ev in st.session_state.dict_evidencias.items():
@@ -1825,21 +1821,18 @@ else:
                                             link_ev = subir_archivo_a_drive(file_ev.read(), f"Evidencia_{folio_actual}_{idx_ev}_{file_ev.name}", file_ev.type)
                                             if link_ev: dict_evidencias_drive[idx_ev] = link_ev
 
-                                    # 2. Lógica de sobrescritura...
                                     ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
                                     folios_res = ws_res.col_values(1)
-                                    estatus_final = "60% Propuesta" # Default para nuevas
+                                    estatus_final = "60% Propuesta"
                                     
                                     if str(folio_actual) in [str(f) for f in folios_res]:
                                         idx_fila = [str(f) for f in folios_res].index(str(folio_actual)) + 1
-                                        # Leer el estatus actual antes de borrar (Columna 14 / N)
                                         try:
                                             headers = ws_res.row_values(1)
                                             col_est_idx = headers.index("ESTATUS") + 1
                                             estatus_actual = ws_res.cell(idx_fila, col_est_idx).value
                                             if estatus_actual: estatus_final = estatus_actual
                                         except: pass
-                                        
                                         ws_res.delete_rows(idx_fila)
 
                                     ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
@@ -1848,7 +1841,6 @@ else:
                                     if filas_a_borrar:
                                         for fila in reversed(filas_a_borrar): ws_det.delete_rows(fila)
 
-                                    # 3. Registro y PDF
                                     cab = {"folio": folio_actual, "ejecutivo": ejecutivo_nom, "email": mail_e, "tel": tel_e, "cliente": cliente_sel, "contacto": contacto_sel, "vigencia": str(vigencia), "entrega": entrega, "pago": pago, "condiciones": condic}
                                     pdf_blob = generar_pdf_blob(cab, df_analisis, st.session_state.dict_fotos, dict_links_drive)
                                     nombre_pdf = f"{folio_actual}.pdf"
@@ -1860,7 +1852,6 @@ else:
                                     filas_det = []
                                     for real_idx, r in df_analisis.iterrows():
                                         util_linea = r["Util $ (Uni)"] * r["Pzas"]
-                                        # Columna Z (26) es Foto_Link, Columna AA (27) es Financiamiento
                                         filas_det.append([
                                             folio_actual, r.get("Tipo", "PARTIDA"), r["Concepto"], r["Descripción"], 
                                             r["Pzas"], 0, r["SKU"], r["Folio Prov"], r["PM"], str(date.today()), 
@@ -1870,7 +1861,8 @@ else:
                                             r["Venta (IVA)"], r["Venta (Sub)"]*r["Pzas"], r["Venta (IVA)"]*r["Pzas"], 
                                             util_linea*0.03, dict_links_drive.get(real_idx, ""),
                                             r.get("Financiamiento", "Sin Financiera"),
-                                            r.get("Financiera", "N/A")
+                                            r.get("Financiera", "N/A"),
+                                            dict_evidencias_drive.get(real_idx, "")
                                         ])
                                     ws_det.update(f"A{obtener_primera_fila_vacia(ws_det)}", filas_det)
                                     
