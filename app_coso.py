@@ -1046,13 +1046,13 @@ def cargar_cotizacion_para_editar(row, df_resumen):
                 "SKU": "SKU", "FOLIO_PROVEEDOR": "Folio Prov", "PRECIO_PROVEEDOR": "PM",
                 "PROVEEDOR": "Proveedor", "LINK": "Link", "ENVIO_PROVEEDOR": "Envio Prov",
                 "ENVIO_SECUNDARIO": "Envio Sec", "UTILIDAD%": "Util %", "FOTO_LINK": "Foto_Link",
-                "FINANCIAMIENTO": "Financiamiento"
+                "FINANCIAMIENTO": "Financiamiento", "FINANCIERA": "Financiera"
             }
             df_edit = df_edit.rename(columns={k: v for k, v in mapa_cols.items() if k in df_edit.columns})
             
-            # Asegurar columna Financiamiento si no existe en registros viejos
-            if "Financiamiento" not in df_edit.columns:
-                df_edit["Financiamiento"] = "Sin Financiera"
+            # Asegurar columnas nuevas si no existen
+            if "Financiamiento" not in df_edit.columns: df_edit["Financiamiento"] = "Sin Financiera"
+            if "Financiera" not in df_edit.columns: df_edit["Financiera"] = "N/A"
             
             # Asegurar columna Tipo si existe en el DB
             if "TIPO" in [c.upper() for c in partidas[0].keys()]:
@@ -1640,6 +1640,7 @@ else:
                     "Util %": st.column_config.NumberColumn("Margen %", format="%.1f%%"),
                     "Pzas": st.column_config.NumberColumn("Cant", min_value=1),
                     "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True),
+                    "Financiera": st.column_config.SelectboxColumn("Financiera", options=["N/A", "DFS", "HPE", "Otro"], required=True),
                 }
 
                 key_dinamica = f"editor_{st.session_state.get('editor_key', 0)}"
