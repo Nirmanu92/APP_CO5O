@@ -1676,7 +1676,7 @@ else:
                     df_analisis["utilidad total"] = (df_analisis["Util $ (Uni)"] * df_analisis["Pzas"]).round(2)
 
                     cols_finales = [
-                        "Concepto", "Pzas", "Financiamiento", "Financiera",
+                        "Concepto", "Pzas",
                         "Costo unit. prod.prov. sin iva", "Costo unit. prod. prov. con iva", 
                         "total prov sin iva", "total prov con iva",
                         "Envío Local (Unit)", "Envío Local (Total)",
