@@ -1834,7 +1834,8 @@ else:
                                             r["Envio Sec"], r["Util %"]/100, util_linea, r["Venta (Sub)"], 
                                             r["Venta (IVA)"], r["Venta (Sub)"]*r["Pzas"], r["Venta (IVA)"]*r["Pzas"], 
                                             util_linea*0.03, dict_links_drive.get(real_idx, ""),
-                                            r.get("Financiamiento", "Sin Financiera")
+                                            r.get("Financiamiento", "Sin Financiera"),
+                                            r.get("Financiera", "N/A")
                                         ])
                                     ws_det.update(f"A{obtener_primera_fila_vacia(ws_det)}", filas_det)
                                     
