@@ -1045,9 +1045,14 @@ def cargar_cotizacion_para_editar(row, df_resumen):
                 "CONCEPTO": "Concepto", "DESCRIPCION": "Descripción", "PZAS": "Pzas", "CANTIDAD": "Pzas",
                 "SKU": "SKU", "FOLIO_PROVEEDOR": "Folio Prov", "PRECIO_PROVEEDOR": "PM",
                 "PROVEEDOR": "Proveedor", "LINK": "Link", "ENVIO_PROVEEDOR": "Envio Prov",
-                "ENVIO_SECUNDARIO": "Envio Sec", "UTILIDAD%": "Util %", "FOTO_LINK": "Foto_Link"
+                "ENVIO_SECUNDARIO": "Envio Sec", "UTILIDAD%": "Util %", "FOTO_LINK": "Foto_Link",
+                "FINANCIAMIENTO": "Financiamiento"
             }
             df_edit = df_edit.rename(columns={k: v for k, v in mapa_cols.items() if k in df_edit.columns})
+            
+            # Asegurar columna Financiamiento si no existe en registros viejos
+            if "Financiamiento" not in df_edit.columns:
+                df_edit["Financiamiento"] = "Sin Financiera"
             
             # Asegurar columna Tipo si existe en el DB
             if "TIPO" in [c.upper() for c in partidas[0].keys()]:
@@ -1623,16 +1628,18 @@ else:
                         "Tipo": "PARTIDA", "Concepto": "", "Descripción": "", "Pzas": 1, "SKU": "",
                         "PM": 0.0, "Proveedor": lista_prov[0] if lista_prov else "", 
                         "Folio Prov": "", "Link": "",
-                        "Envio Prov": 0.0, "Envio Sec": 0.0, "Util %": 15.0
+                        "Envio Prov": 0.0, "Envio Sec": 0.0, "Util %": 15.0,
+                        "Financiamiento": "Sin Financiera"
                     }])
 
                 config_editor = {
-                    "Tipo": st.column_config.SelectboxColumn("Tipo", options=["PARTIDA", "COMPONENTE"], required=True, help="PARTIDA se muestra en PDF, COMPONENTE se agrupa con la partida anterior."),
+                    "Tipo": st.column_config.SelectboxColumn("Tipo", options=["PARTIDA", "COMPONENTE"], required=True),
                     "Descripción": st.column_config.TextColumn("Descripción", width="medium", required=True),
                     "PM": st.column_config.NumberColumn("P. Mayorista", format="$ %.2f"),
                     "Proveedor": st.column_config.SelectboxColumn("Proveedor", options=lista_prov),
                     "Util %": st.column_config.NumberColumn("Margen %", format="%.1f%%"),
                     "Pzas": st.column_config.NumberColumn("Cant", min_value=1),
+                    "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True),
                 }
 
                 key_dinamica = f"editor_{st.session_state.get('editor_key', 0)}"
