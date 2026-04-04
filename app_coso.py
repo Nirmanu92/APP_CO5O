@@ -1824,7 +1824,17 @@ else:
                                     filas_det = []
                                     for real_idx, r in df_analisis.iterrows():
                                         util_linea = r["Util $ (Uni)"] * r["Pzas"]
-                                        filas_det.append([folio_actual, r.get("Tipo", "PARTIDA"), r["Concepto"], r["Descripción"], r["Pzas"], 0, r["SKU"], r["Folio Prov"], r["PM"], str(date.today()), r["Proveedor"], r["Link"], r["Envio Prov"], r["Costo (Sub)"], r["Costo (IVA)"], r["Costo (Sub)"]*r["Pzas"], r["Costo (IVA)"]*r["Pzas"], r["Envio Sec"], r["Util %"]/100, util_linea, r["Venta (Sub)"], r["Venta (IVA)"], r["Venta (Sub)"]*r["Pzas"], r["Venta (IVA)"]*r["Pzas"], util_linea*0.03, dict_links_drive.get(real_idx, "")])
+                                        # Columna Z (26) es Foto_Link, Columna AA (27) es Financiamiento
+                                        filas_det.append([
+                                            folio_actual, r.get("Tipo", "PARTIDA"), r["Concepto"], r["Descripción"], 
+                                            r["Pzas"], 0, r["SKU"], r["Folio Prov"], r["PM"], str(date.today()), 
+                                            r["Proveedor"], r["Link"], r["Envio Prov"], r["Costo (Sub)"], 
+                                            r["Costo (IVA)"], r["Costo (Sub)"]*r["Pzas"], r["Costo (IVA)"]*r["Pzas"], 
+                                            r["Envio Sec"], r["Util %"]/100, util_linea, r["Venta (Sub)"], 
+                                            r["Venta (IVA)"], r["Venta (Sub)"]*r["Pzas"], r["Venta (IVA)"]*r["Pzas"], 
+                                            util_linea*0.03, dict_links_drive.get(real_idx, ""),
+                                            r.get("Financiamiento", "Sin Financiera")
+                                        ])
                                     ws_det.update(f"A{obtener_primera_fila_vacia(ws_det)}", filas_det)
                                     
                                     st.session_state.pdf_actual = pdf_blob
