@@ -20,6 +20,7 @@ from googleapiclient.http import MediaIoBaseUpload
 FILE_JSON_SERVICE = "manuel-hernandez-d0db41fdbc21.json"
 ID_CARPETA_COTIZACIONES = "1KsDQi-jnVyoO9cQ_8asn2PVDyIUH0x_l"
 ID_CARPETA_IMAGENES = "1rekfucEG3U--N1otCQjnHl0j3hdGRwpg"
+ID_CARPETA_EVIDENCIAS = "19JnLfSSLh4ICq-gHZw0pQfcOpY9fmqj0"
 
 # --- 1. AUTENTICACIÓN PARA SHEETS (CUENTA DE SERVICIO) ---
 @st.cache_resource
