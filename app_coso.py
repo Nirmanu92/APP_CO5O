@@ -1629,18 +1629,18 @@ else:
                         "PM": 0.0, "Proveedor": lista_prov[0] if lista_prov else "", 
                         "Folio Prov": "", "Link": "",
                         "Envio Prov": 0.0, "Envio Sec": 0.0, "Util %": 15.0,
-                        "Financiamiento": "Sin Financiera"
+                        "Financiamiento": "Sin Financiera", "Financiera": "N/A"
                     }])
 
                 config_editor = {
                     "Tipo": st.column_config.SelectboxColumn("Tipo", options=["PARTIDA", "COMPONENTE"], required=True),
-                    "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True, width="medium"),
-                    "Financiera": st.column_config.SelectboxColumn("Financiera", options=["N/A", "DFS", "HPE", "Otro"], required=True),
-                    "Descripción": st.column_config.TextColumn("Descripción", width="large", required=True),
+                    "Descripción": st.column_config.TextColumn("Descripción", width="medium", required=True),
                     "PM": st.column_config.NumberColumn("P. Mayorista", format="$ %.2f"),
                     "Proveedor": st.column_config.SelectboxColumn("Proveedor", options=lista_prov),
                     "Util %": st.column_config.NumberColumn("Margen %", format="%.1f%%"),
                     "Pzas": st.column_config.NumberColumn("Cant", min_value=1),
+                    "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True),
+                    "Financiera": st.column_config.SelectboxColumn("Financiera", options=["N/A", "DFS", "HPE", "Otro"], required=True),
                 }
 
                 key_dinamica = f"editor_{st.session_state.get('editor_key', 0)}"
@@ -1676,7 +1676,7 @@ else:
                     df_analisis["utilidad total"] = (df_analisis["Util $ (Uni)"] * df_analisis["Pzas"]).round(2)
 
                     cols_finales = [
-                        "Concepto", "Pzas",
+                        "Concepto", "Pzas", "Financiamiento", "Financiera",
                         "Costo unit. prod.prov. sin iva", "Costo unit. prod. prov. con iva", 
                         "total prov sin iva", "total prov con iva",
                         "Envío Local (Unit)", "Envío Local (Total)",
