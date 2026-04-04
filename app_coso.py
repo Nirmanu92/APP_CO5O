@@ -1761,118 +1761,118 @@ else:
                                 st.session_state.dict_evidencias[real_idx] = evidencia
 
             with tab5:
-                    # Cálculos Maestros
-                    costo_t_sin = (costo_final_v * df_analisis["Pzas"]).sum()
-                    costo_t_con = costo_t_sin * 1.16
-                    venta_t_sin = (df_analisis["Venta (Sub)"] * df_analisis["Pzas"]).sum()
-                    venta_t_con = df_analisis["Total Línea"].sum()
-                    util_t = (df_analisis["Util $ (Uni)"] * df_analisis["Pzas"]).sum()
-                    comision_t = util_t * 0.03
+                # Cálculos Maestros
+                costo_t_sin = (costo_final_v * df_analisis["Pzas"]).sum()
+                costo_t_con = costo_t_sin * 1.16
+                venta_t_sin = (df_analisis["Venta (Sub)"] * df_analisis["Pzas"]).sum()
+                venta_t_con = df_analisis["Total Línea"].sum()
+                util_t = (df_analisis["Util $ (Uni)"] * df_analisis["Pzas"]).sum()
+                comision_t = util_t * 0.03
 
-                    # --- MÉTRICAS EN GRANDE ---
-                    m1, m2, m3 = st.columns(3)
-                    with m1: 
-                        st.metric("COSTO TOTAL (Sin IVA)", f"$ {costo_t_sin:,.2f}")
-                        st.metric("COSTO TOTAL (Con IVA)", f"$ {costo_t_con:,.2f}")
-                    with m2:
-                        st.metric("VENTA TOTAL (Sin IVA)", f"$ {venta_t_sin:,.2f}")
-                        st.metric("VENTA TOTAL (Con IVA)", f"$ {venta_t_con:,.2f}", delta_color="normal")
-                    with m3:
-                        st.metric("UTILIDAD TOTAL", f"$ {util_t:,.2f}")
-                        st.metric("COMISIÓN (3%)", f"$ {comision_t:,.2f}")
+                # --- MÉTRICAS EN GRANDE ---
+                m1, m2, m3 = st.columns(3)
+                with m1: 
+                    st.metric("COSTO TOTAL (Sin IVA)", f"$ {costo_t_sin:,.2f}")
+                    st.metric("COSTO TOTAL (Con IVA)", f"$ {costo_t_con:,.2f}")
+                with m2:
+                    st.metric("VENTA TOTAL (Sin IVA)", f"$ {venta_t_sin:,.2f}")
+                    st.metric("VENTA TOTAL (Con IVA)", f"$ {venta_t_con:,.2f}", delta_color="normal")
+                with m3:
+                    st.metric("UTILIDAD TOTAL", f"$ {util_t:,.2f}")
+                    st.metric("COMISIÓN (3%)", f"$ {comision_t:,.2f}")
 
-                    st.divider()
+                st.divider()
 
-                    # --- RESUMEN DE DATOS ---
-                    c_r1, c_r2 = st.columns(2)
-                    with c_r1:
-                        st.markdown(f"**Cliente:** {st.session_state.get('cliente_sel', 'No seleccionado')}")
-                        st.markdown(f"**Atención:** {st.session_state.get('contacto_sel', 'No seleccionado')}")
-                        st.markdown(f"**Folio:** {st.session_state.get('folio_val', 'N/A')}")
-                        st.markdown(f"**Vigencia:** {vigencia}")
-                    with c_r2:
-                        st.markdown(f"**Pago:** {st.session_state.get('pago_val', 'No seleccionado')}")
-                        st.markdown(f"**Entrega:** {st.session_state.get('entrega_val', 'No seleccionado')}")
-                        st.markdown(f"**Condiciones:** {st.session_state.get('condic_val', 'No seleccionado')}")
-                        st.markdown(f"**Partidas:** {len(df_analisis)} conceptos")
+                # --- RESUMEN DE DATOS ---
+                c_r1, c_r2 = st.columns(2)
+                with c_r1:
+                    st.markdown(f"**Cliente:** {st.session_state.get('cliente_sel', 'No seleccionado')}")
+                    st.markdown(f"**Atención:** {st.session_state.get('contacto_sel', 'No seleccionado')}")
+                    st.markdown(f"**Folio:** {st.session_state.get('folio_val', 'N/A')}")
+                    st.markdown(f"**Vigencia:** {vigencia}")
+                with c_r2:
+                    st.markdown(f"**Pago:** {st.session_state.get('pago_val', 'No seleccionado')}")
+                    st.markdown(f"**Entrega:** {st.session_state.get('entrega_val', 'No seleccionado')}")
+                    st.markdown(f"**Condiciones:** {st.session_state.get('condic_val', 'No seleccionado')}")
+                    st.markdown(f"**Partidas:** {len(df_analisis)} conceptos")
 
-                    st.write("**Conceptos a registrar:**", ", ".join(df_analisis["Concepto"].tolist()))
-                    
-                    st.divider()
-                    if st.button("CONFIRMAR Y GUARDAR TODO", use_container_width=True, type="primary"):
-                        if "Seleccionar..." in [ejecutivo_nom, cliente_sel, contacto_sel, entrega, pago, condic] or not st.session_state.folio_val:
-                            st.error("Revisa que todos los campos obligatorios en 'Generales' estén llenos.")
-                        else:
-                            try:
-                                with st.spinner("Guardando en Sheets y Drive..."):
-                                    folio_actual = st.session_state.folio_val
-                                    
-                                    dict_links_drive = st.session_state.get('dict_fotos_links', {}).copy()
-                                    if st.session_state.dict_fotos:
-                                        for idx_f, bytes_f in st.session_state.dict_fotos.items():
-                                            bytes_f.seek(0)
-                                            link_d = subir_archivo_a_drive(bytes_f.read(), f"Partida_{folio_actual}_{idx_f}.png", 'image/png')
-                                            if link_d: dict_links_drive[idx_f] = link_d
-                                    
-                                    dict_evidencias_drive = st.session_state.get('dict_evidencias_links', {}).copy()
-                                    if st.session_state.get('dict_evidencias'):
-                                        for idx_ev, file_ev in st.session_state.dict_evidencias.items():
-                                            file_ev.seek(0)
-                                            link_ev = subir_archivo_a_drive(file_ev.read(), f"Evidencia_{folio_actual}_{idx_ev}_{file_ev.name}", file_ev.type)
-                                            if link_ev: dict_evidencias_drive[idx_ev] = link_ev
+                st.write("**Conceptos a registrar:**", ", ".join(df_analisis["Concepto"].tolist()))
+                
+                st.divider()
+                if st.button("CONFIRMAR Y GUARDAR TODO", use_container_width=True, type="primary"):
+                    if "Seleccionar..." in [ejecutivo_nom, cliente_sel, contacto_sel, entrega, pago, condic] or not st.session_state.folio_val:
+                        st.error("Revisa que todos los campos obligatorios en 'Generales' estén llenos.")
+                    else:
+                        try:
+                            with st.spinner("Guardando en Sheets y Drive..."):
+                                folio_actual = st.session_state.folio_val
+                                
+                                dict_links_drive = st.session_state.get('dict_fotos_links', {}).copy()
+                                if st.session_state.dict_fotos:
+                                    for idx_f, bytes_f in st.session_state.dict_fotos.items():
+                                        bytes_f.seek(0)
+                                        link_d = subir_archivo_a_drive(bytes_f.read(), f"Partida_{folio_actual}_{idx_f}.png", 'image/png')
+                                        if link_d: dict_links_drive[idx_f] = link_d
+                                
+                                dict_evidencias_drive = st.session_state.get('dict_evidencias_links', {}).copy()
+                                if st.session_state.get('dict_evidencias'):
+                                    for idx_ev, file_ev in st.session_state.dict_evidencias.items():
+                                        file_ev.seek(0)
+                                        link_ev = subir_archivo_a_drive(file_ev.read(), f"Evidencia_{folio_actual}_{idx_ev}_{file_ev.name}", file_ev.type)
+                                        if link_ev: dict_evidencias_drive[idx_ev] = link_ev
 
-                                    ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
-                                    folios_res = ws_res.col_values(1)
-                                    estatus_final = "60% Propuesta"
-                                    
-                                    if str(folio_actual) in [str(f) for f in folios_res]:
-                                        idx_fila = [str(f) for f in folios_res].index(str(folio_actual)) + 1
-                                        try:
-                                            headers = ws_res.row_values(1)
-                                            col_est_idx = headers.index("ESTATUS") + 1
-                                            estatus_actual = ws_res.cell(idx_fila, col_est_idx).value
-                                            if estatus_actual: estatus_final = estatus_actual
-                                        except: pass
-                                        ws_res.delete_rows(idx_fila)
+                                ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
+                                folios_res = ws_res.col_values(1)
+                                estatus_final = "60% Propuesta"
+                                
+                                if str(folio_actual) in [str(f) for f in folios_res]:
+                                    idx_fila = [str(f) for f in folios_res].index(str(folio_actual)) + 1
+                                    try:
+                                        headers = ws_res.row_values(1)
+                                        col_est_idx = headers.index("ESTATUS") + 1
+                                        estatus_actual = ws_res.cell(idx_fila, col_est_idx).value
+                                        if estatus_actual: estatus_final = estatus_actual
+                                    except: pass
+                                    ws_res.delete_rows(idx_fila)
 
-                                    ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
-                                    folios_det = ws_det.col_values(1)
-                                    filas_a_borrar = [i + 1 for i, val in enumerate(folios_det) if str(val) == str(folio_actual)]
-                                    if filas_a_borrar:
-                                        for fila in reversed(filas_a_borrar): ws_det.delete_rows(fila)
+                                ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
+                                folios_det = ws_det.col_values(1)
+                                filas_a_borrar = [i + 1 for i, val in enumerate(folios_det) if str(val) == str(folio_actual)]
+                                if filas_a_borrar:
+                                    for fila in reversed(filas_a_borrar): ws_det.delete_rows(fila)
 
-                                    cab = {"folio": folio_actual, "ejecutivo": ejecutivo_nom, "email": mail_e, "tel": tel_e, "cliente": cliente_sel, "contacto": contacto_sel, "vigencia": str(vigencia), "entrega": entrega, "pago": pago, "condiciones": condic}
-                                    pdf_blob = generar_pdf_blob(cab, df_analisis, st.session_state.dict_fotos, dict_links_drive)
-                                    nombre_pdf = f"{folio_actual}.pdf"
-                                    link_pdf_drive = subir_archivo_a_drive(pdf_blob, nombre_pdf, 'application/pdf')
-                                    
-                                    datos_res = [folio_actual, ejecutivo_nom, mail_e, tel_e, str(date.today()), link_pdf_drive, cliente_sel, contacto_sel, str(vigencia), entrega, pago, condic, comentarios, estatus_final]
-                                    ws_res.update(f"A{obtener_primera_fila_vacia(ws_res)}", [datos_res])
+                                cab = {"folio": folio_actual, "ejecutivo": ejecutivo_nom, "email": mail_e, "tel": tel_e, "cliente": cliente_sel, "contacto": contacto_sel, "vigencia": str(vigencia), "entrega": entrega, "pago": pago, "condiciones": condic}
+                                pdf_blob = generar_pdf_blob(cab, df_analisis, st.session_state.dict_fotos, dict_links_drive)
+                                nombre_pdf = f"{folio_actual}.pdf"
+                                link_pdf_drive = subir_archivo_a_drive(pdf_blob, nombre_pdf, 'application/pdf')
+                                
+                                datos_res = [folio_actual, ejecutivo_nom, mail_e, tel_e, str(date.today()), link_pdf_drive, cliente_sel, contacto_sel, str(vigencia), entrega, pago, condic, comentarios, estatus_final]
+                                ws_res.update(f"A{obtener_primera_fila_vacia(ws_res)}", [datos_res])
 
-                                    filas_det = []
-                                    for real_idx, r in df_analisis.iterrows():
-                                        util_linea = r["Util $ (Uni)"] * r["Pzas"]
-                                        filas_det.append([
-                                            folio_actual, r.get("Tipo", "PARTIDA"), r["Concepto"], r["Descripción"], 
-                                            r["Pzas"], 0, r["SKU"], r["Folio Prov"], r["PM"], str(date.today()), 
-                                            r["Proveedor"], r["Link"], r["Envio Prov"], r["Costo (Sub)"], 
-                                            r["Costo (IVA)"], r["Costo (Sub)"]*r["Pzas"], r["Costo (IVA)"]*r["Pzas"], 
-                                            r["Envio Sec"], r["Util %"]/100, util_linea, r["Venta (Sub)"], 
-                                            r["Venta (IVA)"], r["Venta (Sub)"]*r["Pzas"], r["Venta (IVA)"]*r["Pzas"], 
-                                            util_linea*0.03, dict_links_drive.get(real_idx, ""),
-                                            r.get("Financiamiento", "Sin Financiera"),
-                                            r.get("Financiera", "N/A"),
-                                            dict_evidencias_drive.get(real_idx, "")
-                                        ])
-                                    ws_det.update(f"A{obtener_primera_fila_vacia(ws_det)}", filas_det)
-                                    
-                                    st.session_state.pdf_actual = pdf_blob
-                                    st.session_state.nombre_pdf = nombre_pdf
-                                    st.session_state.remision_actual = generar_remision_blob(cab, df_analisis, st.session_state.dict_fotos, dict_links_drive)
-                                    st.session_state.registro_exitoso = True
-                                    st.balloons()
-                                    st.rerun()
-                            except Exception as e: st.error(f"Error: {e}")
+                                filas_det = []
+                                for real_idx, r in df_analisis.iterrows():
+                                    util_linea = r["Util $ (Uni)"] * r["Pzas"]
+                                    filas_det.append([
+                                        folio_actual, r.get("Tipo", "PARTIDA"), r["Concepto"], r["Descripción"], 
+                                        r["Pzas"], 0, r["SKU"], r["Folio Prov"], r["PM"], str(date.today()), 
+                                        r["Proveedor"], r["Link"], r["Envio Prov"], r["Costo (Sub)"], 
+                                        r["Costo (IVA)"], r["Costo (Sub)"]*r["Pzas"], r["Costo (IVA)"]*r["Pzas"], 
+                                        r["Envio Sec"], r["Util %"]/100, util_linea, r["Venta (Sub)"], 
+                                        r["Venta (IVA)"], r["Venta (Sub)"]*r["Pzas"], r["Venta (IVA)"]*r["Pzas"], 
+                                        util_linea*0.03, dict_links_drive.get(real_idx, ""),
+                                        r.get("Financiamiento", "Sin Financiera"),
+                                        r.get("Financiera", "N/A"),
+                                        dict_evidencias_drive.get(real_idx, "")
+                                    ])
+                                ws_det.update(f"A{obtener_primera_fila_vacia(ws_det)}", filas_det)
+                                
+                                st.session_state.pdf_actual = pdf_blob
+                                st.session_state.nombre_pdf = nombre_pdf
+                                st.session_state.remision_actual = generar_remision_blob(cab, df_analisis, st.session_state.dict_fotos, dict_links_drive)
+                                st.session_state.registro_exitoso = True
+                                st.balloons()
+                                st.rerun()
+                        except Exception as e: st.error(f"Error: {e}")
 
                 if st.session_state.get('registro_exitoso'):
                     st.success("¡Guardado con éxito!")
