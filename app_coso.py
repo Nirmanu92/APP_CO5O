@@ -1736,8 +1736,31 @@ else:
                                     st.image(foto, use_container_width=True)
 
             with tab4:
-                st.subheader("Resumen de Validación")
-                if editado is not None and not editado.empty:
+                st.subheader("Documentos de Respaldo por Producto")
+                st.info("Sube aquí cotizaciones de proveedores, propuestas de financiera o capturas de pantalla de cada producto.")
+                if 'dict_evidencias' not in st.session_state: st.session_state.dict_evidencias = {}
+                
+                if not editado.empty:
+                    for real_idx, row in editado.iterrows():
+                        nombre_p = row["Concepto"] if row["Concepto"] else f"Partida {real_idx+1}"
+                        col_ev1, col_ev2 = st.columns([2, 1])
+                        
+                        with col_ev1:
+                            if 'dict_evidencias_links' in st.session_state and real_idx in st.session_state.dict_evidencias_links:
+                                link_previo = st.session_state.dict_evidencias_links[real_idx]
+                                if link_previo:
+                                    st.markdown(f"✅ **{nombre_p}**: [Ver documento actual]({link_previo})")
+                                else:
+                                    st.markdown(f"⚪ **{nombre_p}**: Sin documento")
+                            else:
+                                st.markdown(f"⚪ **{nombre_p}**: Sin documento")
+                        
+                        with col_ev2:
+                            evidencia = st.file_uploader(f"Cargar para: {nombre_p}", type=["pdf", "png", "jpg", "jpeg", "docx"], key=f"ev_{real_idx}")
+                            if evidencia:
+                                st.session_state.dict_evidencias[real_idx] = evidencia
+
+            with tab5:
                     # Cálculos Maestros
                     costo_t_sin = (costo_final_v * df_analisis["Pzas"]).sum()
                     costo_t_con = costo_t_sin * 1.16
@@ -1786,15 +1809,23 @@ else:
                                 with st.spinner("Guardando en Sheets y Drive..."):
                                     folio_actual = st.session_state.folio_val
                                     
-                                    # 1. Subir imágenes nuevas
+                                    # 1. Subir imágenes nuevas (Ilustraciones)
                                     dict_links_drive = st.session_state.get('dict_fotos_links', {}).copy()
                                     if st.session_state.dict_fotos:
                                         for idx_f, bytes_f in st.session_state.dict_fotos.items():
                                             bytes_f.seek(0)
                                             link_d = subir_archivo_a_drive(bytes_f.read(), f"Partida_{folio_actual}_{idx_f}.png", 'image/png')
                                             if link_d: dict_links_drive[idx_f] = link_d
+                                    
+                                    # 1.1 Subir evidencias nuevas (Documentos de respaldo)
+                                    dict_evidencias_drive = st.session_state.get('dict_evidencias_links', {}).copy()
+                                    if st.session_state.get('dict_evidencias'):
+                                        for idx_ev, file_ev in st.session_state.dict_evidencias.items():
+                                            file_ev.seek(0)
+                                            link_ev = subir_archivo_a_drive(file_ev.read(), f"Evidencia_{folio_actual}_{idx_ev}_{file_ev.name}", file_ev.type)
+                                            if link_ev: dict_evidencias_drive[idx_ev] = link_ev
 
-                                    # 2. Lógica de sobrescritura y preservación de estatus
+                                    # 2. Lógica de sobrescritura...
                                     ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
                                     folios_res = ws_res.col_values(1)
                                     estatus_final = "60% Propuesta" # Default para nuevas
