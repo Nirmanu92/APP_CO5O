@@ -1046,13 +1046,14 @@ def cargar_cotizacion_para_editar(row, df_resumen):
                 "SKU": "SKU", "FOLIO_PROVEEDOR": "Folio Prov", "PRECIO_PROVEEDOR": "PM",
                 "PROVEEDOR": "Proveedor", "LINK": "Link", "ENVIO_PROVEEDOR": "Envio Prov",
                 "ENVIO_SECUNDARIO": "Envio Sec", "UTILIDAD%": "Util %", "FOTO_LINK": "Foto_Link",
-                "FINANCIAMIENTO": "Financiamiento", "FINANCIERA": "Financiera"
+                "FINANCIAMIENTO": "Financiamiento", "FINANCIERA": "Financiera", "EVIDENCIA_LINK": "Evidencia_Link"
             }
             df_edit = df_edit.rename(columns={k: v for k, v in mapa_cols.items() if k in df_edit.columns})
             
             # Asegurar columnas nuevas si no existen
             if "Financiamiento" not in df_edit.columns: df_edit["Financiamiento"] = "Sin Financiera"
             if "Financiera" not in df_edit.columns: df_edit["Financiera"] = "N/A"
+            if "Evidencia_Link" not in df_edit.columns: df_edit["Evidencia_Link"] = ""
             
             # Asegurar columna Tipo si existe en el DB
             if "TIPO" in [c.upper() for c in partidas[0].keys()]:
@@ -1063,6 +1064,9 @@ def cargar_cotizacion_para_editar(row, df_resumen):
 
             if "Foto_Link" in df_edit.columns:
                 st.session_state.dict_fotos_links = {idx: r["Foto_Link"] for idx, r in df_edit.iterrows() if r["Foto_Link"]}
+            
+            if "Evidencia_Link" in df_edit.columns:
+                st.session_state.dict_evidencias_links = {idx: r["Evidencia_Link"] for idx, r in df_edit.iterrows() if r["Evidencia_Link"]}
 
             if "Util %" in df_edit.columns:
                 df_edit["Util %"] = pd.to_numeric(df_edit["Util %"], errors='coerce').fillna(0)
