@@ -443,177 +443,182 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     # --- PROCESAR AGRUPACIÓN ---
     partidas_pdf = []
     current_p = None
-    
     for _, row in df_partidas.iterrows():
         tipo = row.get("Tipo", "PARTIDA")
         if tipo == "PARTIDA":
-            if current_p is not None:
-                partidas_pdf.append(current_p)
+            if current_p is not None: partidas_pdf.append(current_p)
             current_p = row.copy()
         else:
             if current_p is not None:
-                # Sumar valores de venta al padre
                 current_p["Venta (Sub)"] += row["Venta (Sub)"]
                 current_p["Venta (IVA)"] += row["Venta (IVA)"]
             else:
-                # Si es componente y no hay padre, tratar como partida (seguridad)
                 partidas_pdf.append(row.copy())
-    
-    if current_p is not None:
-        partidas_pdf.append(current_p)
-    
+    if current_p is not None: partidas_pdf.append(current_p)
     df_pdf = pd.DataFrame(partidas_pdf)
 
     pdf = PDF(format="letter")
-    pdf.set_auto_page_break(auto=True, margin=30)
+    pdf.set_auto_page_break(auto=True, margin=25)
     pdf.add_page()
     
-    azul_corp = (31, 73, 125)
-    gris_suave = (245, 246, 247)
-    gris_texto = (60, 60, 60)
+    # Paleta Elite
+    oxford = (40, 40, 40)
+    azul_deep = (20, 45, 75)
+    gris_borde = (220, 220, 220)
+    gris_fondo = (250, 250, 250)
+    texto_fuerte = (30, 30, 30)
+    texto_suave = (80, 80, 80)
 
-    # --- ENCABEZADO ---
-    pdf.set_font("helvetica", "B", 16)
-    pdf.set_xy(15, 35)
+    # --- ENCABEZADO (Folio y Fechas) ---
+    pdf.set_xy(15, 32)
+    pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(100, 7, f"Folio: {limpiar_texto(datos_cab['folio'])}", ln=False)
+    pdf.cell(100, 7, f"FOLIO: {limpiar_texto(datos_cab['folio'])}", ln=False)
 
+    pdf.set_font("helvetica", "", 8)
+    pdf.set_x(140)
     fecha_emision = date.today().strftime("%d/%m/%Y")
-    try:
-        from datetime import datetime
-        fecha_vigencia = datetime.strptime(datos_cab['vigencia'], "%Y-%m-%d").strftime("%d/%m/%Y")
-    except:
-        fecha_vigencia = datos_cab['vigencia']
-
-    pdf.set_font("helvetica", "", 10)
-    pdf.set_x(130)
-    pdf.cell(65, 5, f"Emisión: {fecha_emision}", ln=True, align='R')
-    pdf.set_x(130)
-    pdf.cell(65, 5, f"Vigencia: {limpiar_texto(fecha_vigencia)}", ln=True, align='R')
-
-    pdf.ln(6)
+    try: fecha_vigencia = datetime.strptime(datos_cab['vigencia'], "%Y-%m-%d").strftime("%d/%m/%Y")
+    except: fecha_vigencia = datos_cab['vigencia']
     
+    pdf.cell(55, 4, f"EMISIÓN: {fecha_emision}", ln=True, align='R')
+    pdf.set_x(140)
+    pdf.cell(55, 4, f"VIGENCIA: {limpiar_texto(fecha_vigencia)}", ln=True, align='R')
+
+    # --- CUADROS DE CONTACTO (Más compactos) ---
+    pdf.ln(4)
     y_bloque = pdf.get_y()
-    pdf.set_fill_color(*gris_suave)
-    pdf.rect(15, y_bloque, 85, 18, "F")
-    pdf.rect(110, y_bloque, 85, 18, "F")
+    pdf.set_draw_color(*gris_borde)
+    pdf.set_fill_color(*gris_fondo)
+    pdf.rect(15, y_bloque, 88, 15, "F")
+    pdf.rect(107, y_bloque, 88, 15, "F")
     
-    pdf.set_xy(18, y_bloque + 3)
-    pdf.set_font("helvetica", "", 9)
-    pdf.set_text_color(*gris_texto)
-    pdf.multi_cell(78, 4.5, f"{limpiar_texto(datos_cab['cliente'])}\nAtención: {limpiar_texto(datos_cab['contacto'])}")
+    pdf.set_xy(18, y_bloque + 2)
+    pdf.set_font("helvetica", "B", 8)
+    pdf.set_text_color(*texto_fuerte)
+    pdf.cell(80, 4, "CLIENTE / ATENCIÓN", ln=True)
+    pdf.set_font("helvetica", "", 8)
+    pdf.set_text_color(*texto_suave)
+    pdf.set_x(18)
+    pdf.multi_cell(80, 3.5, f"{limpiar_texto(datos_cab['cliente'])}\n{limpiar_texto(datos_cab['contacto'])}")
     
-    pdf.set_xy(113, y_bloque + 3)
-    pdf.multi_cell(78, 4.5, f"{limpiar_texto(datos_cab['ejecutivo'])}\n{limpiar_texto(datos_cab['email'])}")
+    pdf.set_xy(110, y_bloque + 2)
+    pdf.set_font("helvetica", "B", 8)
+    pdf.set_text_color(*texto_fuerte)
+    pdf.cell(80, 4, "EMISOR / CONTACTO", ln=True)
+    pdf.set_font("helvetica", "", 8)
+    pdf.set_text_color(*texto_suave)
+    pdf.set_xy(110, y_bloque + 6)
+    pdf.multi_cell(80, 3.5, f"{limpiar_texto(datos_cab['ejecutivo'])}\n{limpiar_texto(datos_cab['email'])}")
 
     # --- TABLA DE PRODUCTOS ---
-    pdf.set_xy(15, y_bloque + 22)
-    pdf.set_fill_color(*azul_corp)
+    pdf.set_xy(15, y_bloque + 18)
+    pdf.set_fill_color(*oxford)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", "B", 9)
+    pdf.set_font("helvetica", "B", 8)
     
-    w_cant, w_desc, w_img, w_unit, w_total = 12, 88, 25, 25, 30
-    pdf.cell(w_cant, 10, "CANT", 0, 0, "C", True)
-    pdf.cell(w_desc, 10, " DESCRIPCIÓN", 0, 0, "L", True)
-    pdf.cell(w_img, 10, "", 0, 0, "C", True)
-    pdf.cell(w_unit, 10, "UNITARIO", 0, 0, "R", True)
-    pdf.cell(w_total, 10, "TOTAL ", 0, 1, "R", True)
+    w_cant, w_desc, w_img, w_unit, w_total = 10, 95, 20, 25, 30
+    pdf.cell(w_cant, 8, "CANT", 0, 0, "C", True)
+    pdf.cell(w_desc, 8, " DESCRIPCIÓN", 0, 0, "L", True)
+    pdf.cell(w_img, 8, "", 0, 0, "C", True)
+    pdf.cell(w_unit, 8, "UNITARIO", 0, 0, "R", True)
+    pdf.cell(w_total, 8, "TOTAL (IVA INC) ", 0, 1, "R", True)
 
-    pdf.set_text_color(*gris_texto)
-    
+    pdf.set_text_color(*texto_fuerte)
     for i, (idx, row) in enumerate(df_pdf.iterrows()):
-        pdf.set_font("helvetica", "", 8)
-        desc_limpia = f"{limpiar_texto(row['Concepto'])}\n{limpiar_texto(row['Descripción'])}"
-        
-        # Calcular altura necesaria
-        lineas = len(pdf.multi_cell(w_desc - 4, 4, desc_limpia, split_only=True))
-        h_fila = max((lineas * 4) + 6, 24)
+        # Calcular altura
+        pdf.set_font("helvetica", "", 7)
+        desc_txt = f"{limpiar_texto(row['Concepto'])}\n{limpiar_texto(row['Descripción'])}"
+        lineas = len(pdf.multi_cell(w_desc - 4, 3.5, desc_txt, split_only=True))
+        h_fila = max((lineas * 3.5) + 4, 18)
 
-        # Control manual de salto de página para mantener diseño
-        if pdf.get_y() + h_fila > 250:
+        if pdf.get_y() + h_fila > 255:
             pdf.add_page()
-            pdf.set_y(35)
-            # Dibujar encabezado de tabla de nuevo
-            pdf.set_fill_color(*azul_corp)
+            pdf.set_y(32)
+            # Re-header
+            pdf.set_fill_color(*oxford)
             pdf.set_text_color(255, 255, 255)
-            pdf.set_font("helvetica", "B", 9)
-            pdf.cell(w_cant, 10, "CANT", 0, 0, "C", True)
-            pdf.cell(w_desc, 10, " DESCRIPCIÓN", 0, 0, "L", True)
-            pdf.cell(w_img, 10, "", 0, 0, "C", True)
-            pdf.cell(w_unit, 10, "UNITARIO", 0, 0, "R", True)
-            pdf.cell(w_total, 10, "TOTAL ", 0, 1, "R", True)
-            pdf.set_text_color(*gris_texto)
+            pdf.set_font("helvetica", "B", 8)
+            pdf.cell(w_cant, 8, "CANT", 0, 0, "C", True)
+            pdf.cell(w_desc, 8, " DESCRIPCIÓN", 0, 0, "L", True)
+            pdf.cell(w_img, 8, "", 0, 0, "C", True)
+            pdf.cell(w_unit, 8, "UNITARIO", 0, 0, "R", True)
+            pdf.cell(w_total, 8, "TOTAL (IVA INC) ", 0, 1, "R", True)
+            pdf.set_text_color(*texto_fuerte)
 
         y_antes = pdf.get_y()
-        # Fondo zebra
-        pdf.set_fill_color(252, 252, 252) if i % 2 == 0 else pdf.set_fill_color(*gris_suave)
+        if i % 2 == 0:
+            pdf.set_fill_color(255, 255, 255)
+        else:
+            pdf.set_fill_color(252, 252, 252)
         pdf.rect(15, y_antes, 180, h_fila, "F")
+        pdf.set_draw_color(240, 240, 240)
+        pdf.line(15, y_antes + h_fila, 195, y_antes + h_fila)
 
-        # Celdas consecutivas (sin set_xy fijos dentro del bucle)
-        pdf.set_font("helvetica", "B", 10)
+        pdf.set_font("helvetica", "B", 9)
         pdf.cell(w_cant, h_fila, str(int(row['Pzas'])), 0, 0, "C")
         
-        # Guardar posición para la multi_cell de descripción
-        x_desc = pdf.get_x()
-        pdf.set_font("helvetica", "B", 9)
-        pdf.set_xy(x_desc + 2, y_antes + 4)
+        # Descripción
+        x_d = pdf.get_x()
+        pdf.set_xy(x_d + 2, y_antes + 2)
+        pdf.set_font("helvetica", "B", 8)
         pdf.cell(w_desc - 4, 4, limpiar_texto(row['Concepto']), ln=True)
-        pdf.set_x(x_desc + 2)
-        pdf.set_font("helvetica", "", 8)
-        pdf.multi_cell(w_desc - 4, 3.5, limpiar_texto(row['Descripción']))
+        pdf.set_x(x_d + 2)
+        pdf.set_font("helvetica", "", 7)
+        pdf.multi_cell(w_desc - 4, 3, limpiar_texto(row['Descripción']))
         
         # Imagen
-        pdf.set_xy(x_desc + w_desc, y_antes)
-        # Priorizar foto nueva, luego link existente
-        foto_final = descargar_imagen_para_pdf(dict_fotos.get(idx) or dict_links.get(idx))
-        if foto_final:
-            try: pdf.image(foto_final, pdf.get_x() + 2, y_antes + 2, w=21)
+        pdf.set_xy(x_d + w_desc, y_antes + 1)
+        foto = descargar_imagen_para_pdf(dict_fotos.get(idx) or dict_links.get(idx))
+        if foto:
+            try: pdf.image(foto, pdf.get_x() + 2, pdf.get_y(), h=h_fila - 2)
             except: pass
-        pdf.set_x(x_desc + w_desc + w_img)
-
+        
         # Precios
-        pdf.set_font("helvetica", "", 9)
+        pdf.set_xy(x_d + w_desc + w_img, y_antes)
+        pdf.set_font("helvetica", "", 8)
         pdf.cell(w_unit, h_fila, f"$ {row['Venta (Sub)']:,.2f}", 0, 0, "R")
-        pdf.set_font("helvetica", "B", 9)
+        pdf.set_font("helvetica", "B", 8)
         pdf.cell(w_total, h_fila, f"$ {row['Venta (IVA)'] * row['Pzas']:,.2f} ", 0, 1, "R")
         
         pdf.set_y(y_antes + h_fila)
 
-    # --- BLOQUE FINAL (Dinámico) ---
-    if pdf.get_y() > 200:
-        pdf.add_page()
-        pdf.set_y(35)
-    else:
-        pdf.ln(10)
-
-    y_final = pdf.get_y()
-    pdf.set_fill_color(*gris_suave)
-    pdf.rect(15, y_final, 100, 30, "F")
+    # --- TOTALES (Compacto) ---
+    pdf.ln(5)
+    if pdf.get_y() > 220: pdf.add_page(); pdf.set_y(32)
     
-    pdf.set_xy(15, y_final + 2)
-    pdf.set_font("helvetica", "B", 10)
-    pdf.cell(100, 6, "  TÉRMINOS Y CONDICIONES", 0, 1, "L")
-    pdf.set_font("helvetica", "", 8)
-    pdf.set_x(17)
-    pdf.multi_cell(96, 4, f"Entrega: {limpiar_texto(datos_cab['entrega'])}\nPago: {limpiar_texto(datos_cab['pago'])}\nNotas: {limpiar_texto(datos_cab['condiciones'])}")
+    y_final = pdf.get_y()
+    pdf.set_font("helvetica", "B", 8)
+    pdf.set_text_color(*texto_fuerte)
+    pdf.set_xy(15, y_final)
+    pdf.cell(100, 5, "TÉRMINOS Y CONDICIONES", ln=True)
+    pdf.set_font("helvetica", "", 7)
+    pdf.set_text_color(*texto_suave)
+    pdf.set_x(15)
+    txt_t = f"Entrega: {datos_cab['entrega']} | Pago: {datos_cab['pago']}\nNotas: {datos_cab['condiciones']}"
+    pdf.multi_cell(90, 3.5, limpiar_texto(txt_t))
 
     subt_v = (df_partidas["Venta (Sub)"] * df_partidas["Pzas"]).sum()
     iva_v = subt_v * 0.16
     total_v = subt_v + iva_v
 
-    pdf.set_xy(130, y_final)
-    pdf.set_font("helvetica", "", 10)
-    pdf.cell(35, 7, "Subtotal:", 0, 0)
-    pdf.cell(30, 7, f"$ {subt_v:,.2f}", 0, 1, "R")
-    pdf.set_x(130)
-    pdf.cell(35, 7, "IVA (16%):", 0, 0)
-    pdf.cell(30, 7, f"$ {iva_v:,.2f}", 0, 1, "R")
-    pdf.ln(2)
-    pdf.set_x(130)
-    pdf.set_fill_color(*azul_corp)
+    pdf.set_xy(135, y_final)
+    pdf.set_font("helvetica", "", 9)
+    pdf.set_text_color(*texto_suave)
+    pdf.cell(30, 6, "Subtotal:", 0, 0)
+    pdf.cell(30, 6, f"$ {subt_v:,.2f}", 0, 1, "R")
+    pdf.set_x(135)
+    pdf.cell(30, 6, "IVA (16%):", 0, 0)
+    pdf.cell(30, 6, f"$ {iva_v:,.2f}", 0, 1, "R")
+    
+    pdf.set_x(135)
+    pdf.set_fill_color(*azul_deep)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", "B", 11)
-    pdf.cell(65, 12, f"  TOTAL MXN:    $ {total_v:,.2f}  ", 0, 1, "C", True)
+    pdf.set_font("helvetica", "B", 10)
+    pdf.cell(60, 10, f"TOTAL MXN:  $ {total_v:,.2f} ", 0, 1, "C", True)
+
+    resultado = pdf.output(dest='S')
+    return resultado.encode('latin-1') if isinstance(resultado, str) else bytes(resultado)
 
     resultado = pdf.output(dest='S')
     if isinstance(resultado, str):
