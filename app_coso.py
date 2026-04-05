@@ -1912,12 +1912,20 @@ else:
                                 nombre_pdf = f"{folio_actual}.pdf"
                                 link_pdf_drive = subir_archivo_a_drive(pdf_blob, nombre_pdf, 'application/pdf')
                                 
-                                datos_res = [folio_actual, ejecutivo_nom, mail_e, tel_e, str(date.today()), link_pdf_drive, cliente_sel, contacto_sel, str(vigencia), entrega, pago, condic, comentarios, estatus_final]
+                                # Registro en Resumen (Persistencia de Moneda y TC en O y P)
+                                datos_res = [
+                                    folio_actual, ejecutivo_nom, mail_e, tel_e, str(date.today()), 
+                                    link_pdf_drive, cliente_sel, contacto_sel, str(vigencia), 
+                                    entrega, pago, condic, comentarios, estatus_final,
+                                    st.session_state.get('moneda_val', 'MXN'),
+                                    st.session_state.get('tc_val', 1.0)
+                                ]
                                 ws_res.update(f"A{obtener_primera_fila_vacia(ws_res)}", [datos_res])
 
                                 filas_det = []
                                 for real_idx, r in df_analisis.iterrows():
                                     util_linea = r["Util $ (Uni)"] * r["Pzas"]
+                                    # Columna AC (29) es Evidencia, Columna AD (30) es Moneda_Item
                                     filas_det.append([
                                         folio_actual, r.get("Tipo", "PARTIDA"), r["Concepto"], r["Descripción"], 
                                         r["Pzas"], 0, r["SKU"], r["Folio Prov"], r["PM"], str(date.today()), 
@@ -1928,10 +1936,10 @@ else:
                                         util_linea*0.03, dict_links_drive.get(real_idx, ""),
                                         r.get("Financiamiento", "Sin Financiera"),
                                         r.get("Financiera", "N/A"),
-                                        dict_evidencias_drive.get(real_idx, "")
+                                        dict_evidencias_drive.get(real_idx, ""),
+                                        r.get("Moneda", "MXN")
                                     ])
                                 ws_det.update(f"A{obtener_primera_fila_vacia(ws_det)}", filas_det)
-                                
                                 st.session_state.pdf_actual = pdf_blob
                                 st.session_state.nombre_pdf = nombre_pdf
                                 st.session_state.remision_actual = generar_remision_blob(cab, df_analisis, st.session_state.dict_fotos, dict_links_drive)
