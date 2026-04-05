@@ -7,3 +7,5 @@ google-api-python-client
 pandas
 fpdf2
 plotly
+python-dotenv
+Pillow

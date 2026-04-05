@@ -398,6 +398,8 @@ import requests
 
 import tempfile
 
+from PIL import Image
+
 # --- HELPER: DESCARGAR IMAGEN PARA PDF ---
 def descargar_imagen_para_pdf(img_obj):
     """Retorna la ruta a un archivo temporal con la imagen para que FPDF la procese con total compatibilidad."""
