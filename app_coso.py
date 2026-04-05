@@ -569,15 +569,34 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
         pdf.set_font("helvetica", "", 7)
         pdf.multi_cell(w_desc - 4, 3, limpiar_texto(row['Descripción']))
         
-        # Imagen (CONFINAMIENTO TOTAL: Max 18x18mm)
+        # Imagen (CONFINAMIENTO TOTAL: Max 18x18mm sin distorsión)
         pos_x_img = x_d + w_desc + 1
         pos_y_img = y_antes + 1
-        foto = descargar_imagen_para_pdf(dict_fotos.get(idx) or dict_links.get(idx))
-        if foto:
+        foto_path = descargar_imagen_para_pdf(dict_fotos.get(idx) or dict_links.get(idx))
+        
+        if foto_path:
             try:
-                # Usar w=18 y h=18. FPDF escalará para que quepa en ese cuadro sin deformar.
-                pdf.image(foto, pos_x_img, pos_y_img, w=18, h=18)
-            except: pass
+                from PIL import Image
+                with Image.open(foto_path) as img:
+                    width, height = img.size
+                    aspect = width / height
+                    
+                    # Calcular dimensiones proporcionales dentro de un cuadro de 18x18
+                    if aspect > 1: # Es más ancha
+                        w_img_p = 18
+                        h_img_p = 18 / aspect
+                    else: # Es más alta o cuadrada
+                        h_img_p = 18
+                        w_img_p = 18 * aspect
+                    
+                    # Centrado horizontal dentro del espacio de 20mm
+                    offset_x = (20 - w_img_p) / 2
+                    # Centrado vertical dentro de la fila (si h_fila > h_img_p)
+                    offset_y = (h_fila - h_img_p) / 2
+                    
+                    pdf.image(foto_path, x_d + w_desc + offset_x, y_antes + offset_y, w=w_img_p, h=h_img_p)
+            except Exception as e:
+                pass # Si falla Pillow, no pintar imagen para no romper el PDF
         
         # Precios
         pdf.set_xy(x_d + w_desc + w_img, y_antes)
