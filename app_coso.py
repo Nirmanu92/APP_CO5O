@@ -1606,12 +1606,25 @@ else:
                         contacto_sel = "Seleccionar..."
 
                 st.divider()
-                col_f1, col_f2, col_f3 = st.columns(3)
+                col_f1, col_f2, col_f3, col_f4 = st.columns([1.5, 1, 1, 1])
                 with col_f1:
                     # Usar directamente st.session_state.folio_val en el widget
                     if 'folio_val' not in st.session_state: st.session_state.folio_val = ""
                     folio = st.text_input("Folio de Cotización:", key="folio_val")
+                
+                with col_f2:
+                    moneda_opciones = ["MXN", "USD"]
+                    idx_moneda = buscar_index(moneda_opciones, st.session_state.get('moneda_val', 'MXN'))
+                    moneda = st.selectbox("Moneda Cotización:", moneda_opciones, index=idx_moneda, key="moneda_val_sel")
+                    st.session_state.moneda_val = moneda
+
                 with col_f3:
+                    # Mostrar TC solo si la cotización es MXN o si hay costos en USD (siempre visible es más seguro)
+                    val_tc = st.session_state.get('tc_val', 18.00)
+                    tc = st.number_input("Tipo de Cambio:", value=val_tc, format="%.2f", key="tc_val_input")
+                    st.session_state.tc_val = tc
+
+                with col_f4:
                     val_vigencia = st.session_state.get('vigencia_val', date.today())
                     vigencia = st.date_input("Vigencia:", value=val_vigencia, key="vigencia_val")
 
@@ -1659,7 +1672,7 @@ else:
 
                 if 'df_partidas' not in st.session_state:
                     st.session_state.df_partidas = pd.DataFrame([{
-                        "Tipo": "PARTIDA", "Concepto": "", "Descripción": "", "Pzas": 1, "SKU": "",
+                        "Tipo": "PARTIDA", "Moneda": "MXN", "Concepto": "", "Descripción": "", "Pzas": 1, "SKU": "",
                         "PM": 0.0, "Proveedor": lista_prov[0] if lista_prov else "", 
                         "Folio Prov": "", "Link": "",
                         "Envio Prov": 0.0, "Envio Sec": 0.0, "Util %": 15.0,
@@ -1668,6 +1681,7 @@ else:
 
                 config_editor = {
                     "Tipo": st.column_config.SelectboxColumn("Tipo", options=["PARTIDA", "COMPONENTE"], required=True),
+                    "Moneda": st.column_config.SelectboxColumn("Moneda", options=["MXN", "USD"], required=True),
                     "Descripción": st.column_config.TextColumn("Descripción", width="medium", required=True),
                     "PM": st.column_config.NumberColumn("P. Mayorista", format="$ %.2f"),
                     "Proveedor": st.column_config.SelectboxColumn("Proveedor", options=lista_prov),
@@ -1685,10 +1699,24 @@ else:
                     for col in ["PM", "Pzas", "Util %", "Envio Prov", "Envio Sec"]:
                         if col in df_analisis.columns: df_analisis[col] = pd.to_numeric(df_analisis[col], errors='coerce').fillna(0)
 
+                    # --- LÓGICA DE CONVERSIÓN MULTIMONEDA ---
+                    tc = st.session_state.get('tc_val', 1.0)
+                    moneda_cot = st.session_state.get('moneda_val', 'MXN')
+
+                    def normalizar_a_cotizacion(precio, moneda_item):
+                        if moneda_cot == "MXN" and moneda_item == "USD": return precio * tc
+                        if moneda_cot == "USD" and moneda_item == "MXN": return precio / tc
+                        return precio
+
+                    # Aplicar conversión a PM y Envíos antes del cálculo
+                    df_analisis["PM_CONV"] = df_analisis.apply(lambda r: normalizar_a_cotizacion(r["PM"], r.get("Moneda", "MXN")), axis=1)
+                    df_analisis["Envio_P_CONV"] = df_analisis.apply(lambda r: normalizar_a_cotizacion(r["Envio Prov"], r.get("Moneda", "MXN")), axis=1)
+                    df_analisis["Envio_S_CONV"] = df_analisis.apply(lambda r: normalizar_a_cotizacion(r["Envio Sec"], r.get("Moneda", "MXN")), axis=1)
+
                     divisores = df_analisis["Proveedor"].map(mapa_iva).fillna(1.0)
-                    df_analisis["Costo (Sub)"] = ((df_analisis["PM"] / divisores) + df_analisis["Envio Prov"]).round(2)
+                    df_analisis["Costo (Sub)"] = ((df_analisis["PM_CONV"] / divisores) + df_analisis["Envio_P_CONV"]).round(2)
                     df_analisis["Costo (IVA)"] = (df_analisis["Costo (Sub)"] * 1.16).round(2)
-                    costo_final_v = df_analisis["Costo (Sub)"] + df_analisis["Envio Sec"]
+                    costo_final_v = df_analisis["Costo (Sub)"] + df_analisis["Envio_S_CONV"]
                     df_analisis["Venta (Sub)"] = (costo_final_v * (1 + (df_analisis["Util %"] / 100))).round(2)
                     df_analisis["Venta (IVA)"] = (df_analisis["Venta (Sub)"] * 1.16).round(2)
                     df_analisis["Util $ (Uni)"] = (df_analisis["Venta (Sub)"] - costo_final_v).round(2)
