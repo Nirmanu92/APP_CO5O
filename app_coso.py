@@ -1899,8 +1899,15 @@ else:
                                 if filas_a_borrar:
                                     for fila in reversed(filas_a_borrar): ws_det.delete_rows(fila)
 
-                                cab = {"folio": folio_actual, "ejecutivo": ejecutivo_nom, "email": mail_e, "tel": tel_e, "cliente": cliente_sel, "contacto": contacto_sel, "vigencia": str(vigencia), "entrega": entrega, "pago": pago, "condiciones": condic}
+                                cab = {
+                                    "folio": folio_actual, "ejecutivo": ejecutivo_nom, "email": mail_e, "tel": tel_e, 
+                                    "cliente": cliente_sel, "contacto": contacto_sel, "vigencia": str(vigencia), 
+                                    "entrega": entrega, "pago": pago, "condiciones": condic,
+                                    "moneda": st.session_state.get('moneda_val', 'MXN'),
+                                    "tc": st.session_state.get('tc_val', 1.0)
+                                }
                                 pdf_blob = generar_pdf_blob(cab, df_analisis, st.session_state.dict_fotos, dict_links_drive)
+
                                 nombre_pdf = f"{folio_actual}.pdf"
                                 link_pdf_drive = subir_archivo_a_drive(pdf_blob, nombre_pdf, 'application/pdf')
                                 
