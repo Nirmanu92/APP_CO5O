@@ -471,6 +471,7 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
 
     # --- ENCABEZADO (Folio y Fechas) ---
     pdf.set_xy(15, 28) # Margen superior subido un poco
+    pdf.set_font("helvetica", "B", 14) # FUENTE DEFINIDA ANTES DE ESCRIBIR
     pdf.set_text_color(255, 255, 255)
     pdf.cell(100, 7, f"FOLIO: {limpiar_texto(datos_cab['folio'])}", ln=False)
 
