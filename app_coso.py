@@ -458,7 +458,9 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     df_pdf = pd.DataFrame(partidas_pdf)
 
     pdf = PDF(format="letter")
-    pdf.set_auto_page_break(auto=True, margin=20) # Margen inferior reducido
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_left_margin(10)
+    pdf.set_right_margin(10)
     pdf.add_page()
     
     # Paleta Elite
@@ -470,115 +472,116 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     texto_suave = (80, 80, 80)
 
     # --- ENCABEZADO (Folio y Fechas) ---
-    pdf.set_xy(15, 28) # Margen superior subido un poco
-    pdf.set_font("helvetica", "B", 14) # FUENTE DEFINIDA ANTES DE ESCRIBIR
+    pdf.set_xy(10, 25) # Ajuste a margen 10mm
+    pdf.set_font("helvetica", "B", 10) # Folio reducido a 10
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(100, 7, f"FOLIO: {limpiar_texto(datos_cab['folio'])}", ln=False)
+    pdf.cell(100, 6, f"FOLIO: {limpiar_texto(datos_cab['folio'])}", ln=False)
 
-    pdf.set_font("helvetica", "", 8)
+    pdf.set_font("helvetica", "", 7.5)
     pdf.set_x(140)
     fecha_emision = date.today().strftime("%d/%m/%Y")
     try: fecha_vigencia = datetime.strptime(datos_cab['vigencia'], "%Y-%m-%d").strftime("%d/%m/%Y")
     except: fecha_vigencia = datos_cab['vigencia']
     
-    pdf.cell(55, 4, f"EMISIÓN: {fecha_emision}", ln=True, align='R')
+    pdf.cell(65, 4, f"EMISIÓN: {fecha_emision}", ln=True, align='R')
     pdf.set_x(140)
-    pdf.cell(55, 4, f"VIGENCIA: {limpiar_texto(fecha_vigencia)}", ln=True, align='R')
+    pdf.cell(65, 4, f"VIGENCIA: {limpiar_texto(fecha_vigencia)}", ln=True, align='R')
 
-    # --- CUADROS DE CONTACTO (Más compactos) ---
-    pdf.ln(4)
+    # --- CUADROS DE CONTACTO (Alineados a 10mm) ---
+    pdf.ln(3)
     y_bloque = pdf.get_y()
     pdf.set_draw_color(*gris_borde)
     pdf.set_fill_color(*gris_fondo)
-    pdf.rect(15, y_bloque, 88, 15, "F")
-    pdf.rect(107, y_bloque, 88, 15, "F")
+    pdf.rect(10, y_bloque, 95, 14, "F")
+    pdf.rect(110, y_bloque, 95, 14, "F")
     
-    pdf.set_xy(18, y_bloque + 2)
-    pdf.set_font("helvetica", "B", 8)
+    pdf.set_xy(13, y_bloque + 2)
+    pdf.set_font("helvetica", "B", 7.5)
     pdf.set_text_color(*texto_fuerte)
-    pdf.cell(80, 4, "CLIENTE / ATENCIÓN", ln=True)
-    pdf.set_font("helvetica", "", 8)
+    pdf.cell(85, 3.5, "CLIENTE / ATENCIÓN", ln=True)
+    pdf.set_font("helvetica", "", 7.5)
     pdf.set_text_color(*texto_suave)
-    pdf.set_x(18)
-    pdf.multi_cell(80, 3.5, f"{limpiar_texto(datos_cab['cliente'])}\n{limpiar_texto(datos_cab['contacto'])}")
+    pdf.set_x(13)
+    pdf.multi_cell(85, 3, f"{limpiar_texto(datos_cab['cliente'])}\n{limpiar_texto(datos_cab['contacto'])}")
     
-    pdf.set_xy(110, y_bloque + 2)
-    pdf.set_font("helvetica", "B", 8)
+    pdf.set_xy(113, y_bloque + 2)
+    pdf.set_font("helvetica", "B", 7.5)
     pdf.set_text_color(*texto_fuerte)
-    pdf.cell(80, 4, "EMISOR / CONTACTO", ln=True)
-    pdf.set_font("helvetica", "", 8)
+    pdf.cell(85, 3.5, "EMISOR / CONTACTO", ln=True)
+    pdf.set_font("helvetica", "", 7.5)
     pdf.set_text_color(*texto_suave)
-    pdf.set_xy(110, y_bloque + 6)
-    pdf.multi_cell(80, 3.5, f"{limpiar_texto(datos_cab['ejecutivo'])}\n{limpiar_texto(datos_cab['email'])}")
+    pdf.set_xy(113, y_bloque + 5.5)
+    pdf.multi_cell(85, 3, f"{limpiar_texto(datos_cab['ejecutivo'])}\n{limpiar_texto(datos_cab['email'])}")
 
     # --- TABLA DE PRODUCTOS ---
-    pdf.set_xy(15, y_bloque + 18)
+    pdf.set_xy(10, y_bloque + 17)
     pdf.set_fill_color(*oxford)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", "B", 8)
+    pdf.set_font("helvetica", "B", 7.5)
     
-    w_cant, w_desc, w_img, w_unit, w_total = 10, 95, 20, 25, 30
-    pdf.cell(w_cant, 8, "CANT", 0, 0, "C", True)
-    pdf.cell(w_desc, 8, " DESCRIPCIÓN", 0, 0, "L", True)
-    pdf.cell(w_img, 8, "", 0, 0, "C", True)
-    pdf.cell(w_unit, 8, "UNITARIO", 0, 0, "R", True)
-    pdf.cell(w_total, 8, "TOTAL (IVA INC) ", 0, 1, "R", True)
+    # Anchos ajustados para margen 10mm (Total 195mm)
+    w_cant, w_desc, w_img, w_unit, w_total = 10, 110, 20, 25, 30
+    pdf.cell(w_cant, 7, "CANT", 0, 0, "C", True)
+    pdf.cell(w_desc, 7, " DESCRIPCIÓN TÉCNICA", 0, 0, "L", True)
+    pdf.cell(w_img, 7, "", 0, 0, "C", True)
+    pdf.cell(w_unit, 7, "UNITARIO", 0, 0, "R", True)
+    pdf.cell(w_total, 7, "TOTAL (IVA INC) ", 0, 1, "R", True)
 
     pdf.set_text_color(*texto_fuerte)
     for i, (idx, row) in enumerate(df_pdf.iterrows()):
-        # Calcular altura
         pdf.set_font("helvetica", "", 7)
         desc_txt = f"{limpiar_texto(row['Concepto'])}\n{limpiar_texto(row['Descripción'])}"
-        lineas = len(pdf.multi_cell(w_desc - 4, 3.5, desc_txt, split_only=True))
-        h_fila = max((lineas * 3.5) + 4, 18)
+        lineas = len(pdf.multi_cell(w_desc - 4, 3, desc_txt, split_only=True))
+        h_fila = max((lineas * 3) + 4, 20) # Altura mínima de 20mm para la foto
 
-        if pdf.get_y() + h_fila > 255:
+        if pdf.get_y() + h_fila > 260:
             pdf.add_page()
-            pdf.set_y(32)
+            pdf.set_y(25)
             # Re-header
             pdf.set_fill_color(*oxford)
             pdf.set_text_color(255, 255, 255)
-            pdf.set_font("helvetica", "B", 8)
-            pdf.cell(w_cant, 8, "CANT", 0, 0, "C", True)
-            pdf.cell(w_desc, 8, " DESCRIPCIÓN", 0, 0, "L", True)
-            pdf.cell(w_img, 8, "", 0, 0, "C", True)
-            pdf.cell(w_unit, 8, "UNITARIO", 0, 0, "R", True)
-            pdf.cell(w_total, 8, "TOTAL (IVA INC) ", 0, 1, "R", True)
+            pdf.set_font("helvetica", "B", 7.5)
+            pdf.cell(w_cant, 7, "CANT", 0, 0, "C", True)
+            pdf.cell(w_desc, 7, " DESCRIPCIÓN TÉCNICA", 0, 0, "L", True)
+            pdf.cell(w_img, 7, "", 0, 0, "C", True)
+            pdf.cell(w_unit, 7, "UNITARIO", 0, 0, "R", True)
+            pdf.cell(w_total, 7, "TOTAL (IVA INC) ", 0, 1, "R", True)
             pdf.set_text_color(*texto_fuerte)
 
         y_antes = pdf.get_y()
-        if i % 2 == 0:
-            pdf.set_fill_color(255, 255, 255)
-        else:
-            pdf.set_fill_color(252, 252, 252)
-        pdf.rect(15, y_antes, 180, h_fila, "F")
+        if i % 2 != 0: pdf.set_fill_color(*gris_fondo)
+        else: pdf.set_fill_color(255, 255, 255)
+        pdf.rect(10, y_antes, 195, h_fila, "F")
         pdf.set_draw_color(240, 240, 240)
-        pdf.line(15, y_antes + h_fila, 195, y_antes + h_fila)
+        pdf.line(10, y_antes + h_fila, 205, y_antes + h_fila)
 
-        pdf.set_font("helvetica", "B", 9)
+        pdf.set_font("helvetica", "B", 8)
         pdf.cell(w_cant, h_fila, str(int(row['Pzas'])), 0, 0, "C")
         
         # Descripción
         x_d = pdf.get_x()
         pdf.set_xy(x_d + 2, y_antes + 2)
-        pdf.set_font("helvetica", "B", 8)
-        pdf.cell(w_desc - 4, 4, limpiar_texto(row['Concepto']), ln=True)
+        pdf.set_font("helvetica", "B", 7.5)
+        pdf.cell(w_desc - 4, 3.5, limpiar_texto(row['Concepto']), ln=True)
         pdf.set_x(x_d + 2)
         pdf.set_font("helvetica", "", 7)
         pdf.multi_cell(w_desc - 4, 3, limpiar_texto(row['Descripción']))
         
-        # Imagen
-        pdf.set_xy(x_d + w_desc, y_antes + 1)
+        # Imagen (CONFINAMIENTO TOTAL: Max 18x18mm)
+        pos_x_img = x_d + w_desc + 1
+        pos_y_img = y_antes + 1
         foto = descargar_imagen_para_pdf(dict_fotos.get(idx) or dict_links.get(idx))
         if foto:
-            try: pdf.image(foto, pdf.get_x() + 2, pdf.get_y(), h=h_fila - 2)
+            try:
+                # Usar w=18 y h=18. FPDF escalará para que quepa en ese cuadro sin deformar.
+                pdf.image(foto, pos_x_img, pos_y_img, w=18, h=18)
             except: pass
         
         # Precios
         pdf.set_xy(x_d + w_desc + w_img, y_antes)
-        pdf.set_font("helvetica", "", 8)
+        pdf.set_font("helvetica", "", 7.5)
         pdf.cell(w_unit, h_fila, f"$ {row['Venta (Sub)']:,.2f}", 0, 0, "R")
-        pdf.set_font("helvetica", "B", 8)
+        pdf.set_font("helvetica", "B", 7.5)
         pdf.cell(w_total, h_fila, f"$ {row['Venta (IVA)'] * row['Pzas']:,.2f} ", 0, 1, "R")
         
         pdf.set_y(y_antes + h_fila)
