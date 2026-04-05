@@ -458,7 +458,7 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     df_pdf = pd.DataFrame(partidas_pdf)
 
     pdf = PDF(format="letter")
-    pdf.set_auto_page_break(auto=True, margin=25)
+    pdf.set_auto_page_break(auto=True, margin=20) # Margen inferior reducido
     pdf.add_page()
     
     # Paleta Elite
@@ -470,8 +470,7 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     texto_suave = (80, 80, 80)
 
     # --- ENCABEZADO (Folio y Fechas) ---
-    pdf.set_xy(15, 32)
-    pdf.set_font("helvetica", "B", 14)
+    pdf.set_xy(15, 28) # Margen superior subido un poco
     pdf.set_text_color(255, 255, 255)
     pdf.cell(100, 7, f"FOLIO: {limpiar_texto(datos_cab['folio'])}", ln=False)
 
