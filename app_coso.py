@@ -1556,7 +1556,8 @@ else:
                 col_e1, col_e2, col_e3 = st.columns(3)
                 
                 def buscar_index(lista, valor):
-                    try: return lista.index(valor) + 1
+                    if not valor or valor not in lista: return 0
+                    try: return lista.index(valor)
                     except: return 0
 
                 with col_e1:
