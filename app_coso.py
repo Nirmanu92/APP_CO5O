@@ -1927,48 +1927,19 @@ else:
                     val = st.session_state.get(key, default)
                     return val if val else default
 
-                with col_e1:
-                    ejecutivos_lista = sorted([u['NOMBRE'] for u in st.session_state.usuarios_db])
-                    opciones_ej = ["Seleccionar..."] + ejecutivos_lista
-                    
-                    val_ej_actual = get_val('ejecutivo_nom')
-                    if val_ej_actual != "Seleccionar..." and val_ej_actual not in opciones_ej:
-                        nombre_match = next((u['NOMBRE'] for u in st.session_state.usuarios_db if u['USUARIO'] == val_ej_actual), None)
-                        if nombre_match: val_ej_actual = nombre_match
-                    
-                    idx_ej = opciones_ej.index(val_ej_actual) if val_ej_actual in opciones_ej else 0
-                    # AGREGADO: on_change para disparo instantáneo
-                    ejecutivo_nom = st.selectbox("Ejecutivo que firma:", opciones_ej, index=idx_ej, key="ej_sel_final", on_change=trigger_generar_folio)
-                    st.session_state.ejecutivo_nom = ejecutivo_nom
-                
-                v_tel, v_mail = ("", "")
-                if ejecutivo_nom != "Seleccionar...":
-                    try:
-                        d = next(u for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo_nom)
-                        v_tel, v_mail = d.get('TELEFONO', ''), d.get('EMAIL', '')
-                    except: pass
-
-                with col_e2:
-                    tel_e = st.text_input("Teléfono:", value=v_tel)
-                with col_e3:
-                    mail_e = st.text_input("Email:", value=v_mail)
-
-                st.divider()
-                col_c1, col_c2 = st.columns(2)
                 with col_c1:
                     lista_rs = sorted(list(set([c['RAZON_SOCIAL'] for c in st.session_state.directorio if c['RAZON_SOCIAL']])))
                     opciones_rs = ["Seleccionar..."] + lista_rs
-                    val_rs_actual = get_val('cliente_sel')
+                    val_rs_actual = st.session_state.get('cliente_sel', 'Seleccionar...')
                     idx_rs = opciones_rs.index(val_rs_actual) if val_rs_actual in opciones_rs else 0
-                    # AGREGADO: on_change para disparo instantáneo
-                    cliente_sel = st.selectbox("Razón Social:", opciones_rs, index=idx_rs, key="rs_sel_final", on_change=trigger_generar_folio)
+                    cliente_sel = st.selectbox("Razón Social:", opciones_rs, index=idx_rs, key="rs_sel_final")
                     st.session_state.cliente_sel = cliente_sel
                 
                 with col_c2:
                     if cliente_sel != "Seleccionar...":
                         contactos = sorted(list(set([c['CONTACTO'] for c in st.session_state.directorio if c['RAZON_SOCIAL'] == cliente_sel])))
                         opciones_c = ["Seleccionar..."] + contactos
-                        val_c_actual = get_val('contacto_sel')
+                        val_c_actual = st.session_state.get('contacto_sel', 'Seleccionar...')
                         idx_c = opciones_c.index(val_c_actual) if val_c_actual in opciones_c else 0
                         contacto_sel = st.selectbox("Atención a:", opciones_c, index=idx_c, key="cont_sel_final")
                         st.session_state.contacto_sel = contacto_sel
@@ -1976,23 +1947,24 @@ else:
                         st.selectbox("Atención a:", ["Seleccionar..."], disabled=True, key="cont_dis")
                         contacto_sel = "Seleccionar..."
 
-                # --- DISPARADOR DE FOLIO AUTOMÁTICO (UNIFICADO Y LIMPIO) ---
-                if (cliente_sel != "Seleccionar..." and ejecutivo_nom != "Seleccionar..." and 
-                    not st.session_state.get('folio_val')):
-                    with st.spinner("Generando folio oficial..."):
-                        # Obtener ID técnico del ejecutivo seleccionado
-                        ej_id_tech = next((u['USUARIO'] for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo_nom), st.session_state.usuario)
-                        nuevo_f = generar_folio_automatico(cliente_sel, ej_id_tech)
-                        if nuevo_f:
-                            st.session_state.folio_val = nuevo_f
-                            st.rerun() # Refrescar para que el folio aparezca abajo
+                # --- LÓGICA DE FOLIO SÚPER-DIRECTA (SIN CALLBACKS) ---
+                if cliente_sel != "Seleccionar..." and ejecutivo_nom != "Seleccionar...":
+                    # Si no hay folio o si el cliente cambió, generar uno nuevo
+                    if not st.session_state.get('folio_val') or st.session_state.get('ultimo_cliente_folio') != cliente_sel:
+                        # Evitar bucle infinito: solo si no es edición
+                        if 'folio_original_edicion' not in st.session_state:
+                            ej_id = next((u['USUARIO'] for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo_nom), st.session_state.usuario)
+                            nuevo_f = generar_folio_automatico(cliente_sel, ej_id)
+                            if nuevo_f:
+                                st.session_state.folio_val = nuevo_f
+                                st.session_state.ultimo_cliente_folio = cliente_sel
 
                 st.divider()
                 col_f1, col_f2, col_f3, col_f4 = st.columns([1.5, 1, 1, 1])
                 with col_f1:
-                    # USAR DIRECTAMENTE LA VARIABLE MAESTRA EN EL WIDGET
-                    folio = st.text_input("Folio de Cotización:", value=st.session_state.get('folio_val', ""), key="folio_val_widget")
-                    st.session_state.folio_val = folio
+                    # Mostramos el folio calculado o lo que el usuario escriba
+                    folio_input = st.text_input("Folio de Cotización:", value=st.session_state.get('folio_val', ""), key="folio_widget_input")
+                    st.session_state.folio_val = folio_input
                 
                 with col_f2:
                     moneda_opciones = ["MXN", "USD"]
