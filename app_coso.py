@@ -4,7 +4,13 @@ from google.oauth2.service_account import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2.credentials import Credentials as UserCredentials
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
+
+# --- HELPER: TIEMPO LOCAL (CDMX) ---
+def ahora_mexico():
+    """Retorna datetime actual ajustado a Ciudad de México (UTC-6)."""
+    return datetime.now(timezone(timedelta(hours=-6)))
+
 import pandas as pd
 import plotly.express as px
 from fpdf import FPDF
@@ -1342,7 +1348,8 @@ if not st.session_state.autenticado:
 else:
     # --- MOSTRAR BANNER DINÁMICO ---
     def obtener_banner_dinamico():
-        hora = datetime.now().hour
+        ahora = ahora_mexico()
+        hora = ahora.hour
         if 6 <= hora < 12: prefijo = "DIA"
         elif 12 <= hora < 19: prefijo = "TARDE"
         else: prefijo = "NOCHE"
@@ -1382,7 +1389,7 @@ else:
             with col_nav3:
                 # Mostrar fecha actual en lugar de hora (que suele fallar por zona horaria en la nube)
                 meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-                ahora = datetime.now()
+                ahora = ahora_mexico()
                 fecha_str = f"{ahora.day} de {meses[ahora.month-1]}, {ahora.year}"
                 st.markdown(f"<p style='text-align: center; font-size: 16px; margin-top: 5px; color: #94A3B8;'>{fecha_str}</p>", unsafe_allow_html=True)
 
