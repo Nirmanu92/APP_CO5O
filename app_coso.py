@@ -73,32 +73,61 @@ def conectar_google_sheets():
             creds = Credentials.from_service_account_info(creds_info, scopes=scope)
             return gspread.authorize(creds)
         except Exception as e:
-            st.error(f"Error técnico en la nube: {str(e)}")
             return None
 
-    # 2. Intentar con archivo local
     if os.path.exists(FILE_JSON_SERVICE):
         try:
             creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
             return gspread.authorize(creds)
-        except Exception as e:
-            st.error(f"Error con archivo local: {e}")
+        except:
             return None
-            
     return None
+
+# --- FUNCIONES DE LECTURA CON CACHÉ (PROTECCIÓN DE CUOTA API 429) ---
+@st.cache_data(ttl=600) # Guardar en memoria por 10 minutos
+def obtener_datos_maestros_cached(nombre_archivo, nombre_ws="sheet1"):
+    """Lee datos maestros con caché para ahorrar cuota de API."""
+    try:
+        gc = conectar_google_sheets()
+        sh = gc.open(nombre_archivo)
+        try: ws = sh.worksheet(nombre_ws)
+        except: ws = sh.get_worksheet(0)
+        return ws.get_all_records()
+    except:
+        return []
+
+@st.cache_data(ttl=300) # Guardar escaneo OVO por 5 minutos
+def obtener_directorio_ejecutivo_cached(sheet_id, usuario_id):
+    """Lee el directorio de un ejecutivo específico con caché."""
+    try:
+        gc = conectar_google_sheets()
+        sh = None
+        if sheet_id and len(str(sheet_id)) > 10:
+            sh = gc.open_by_key(sheet_id)
+        else:
+            sh = gc.open(f"COTIZACIONES_{usuario_id}")
+            
+        for name in ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "HOJA1"]:
+            try:
+                return sh.worksheet(name).get_all_records()
+            except: continue
+    except:
+        return []
+    return []
 
 # --- CARGA SÓLO USUARIOS PARA LOGIN ---
 def cargar_usuarios_login():
+    """Carga la base de datos de usuarios autorizados."""
     if 'usuarios_db' not in st.session_state:
-        try:
-            gc = conectar_google_sheets()
-            if gc is None:
-                st.warning("⚠️ Esperando configuración de base de datos...")
+        st.session_state.usuarios_db = obtener_datos_maestros_cached("CONTROL_USUARIOS")
+        if not st.session_state.usuarios_db:
+            # Reintento sin caché si falla
+            try:
+                gc = conectar_google_sheets()
+                st.session_state.usuarios_db = gc.open("CONTROL_USUARIOS").sheet1.get_all_records()
+            except:
+                st.error("Error crítico de conexión. Favor de recargar la página.")
                 st.stop()
-            st.session_state.usuarios_db = gc.open("CONTROL_USUARIOS").sheet1.get_all_records()
-        except Exception as e:
-            st.error(f"Acceso denegado a la lista de usuarios: {e}")
-            st.stop()
 
 # --- 2. AUTENTICACIÓN PARA DRIVE (OAUTH PERSONAL) ---
 def procesar_callback_oauth():
@@ -248,8 +277,8 @@ def generar_folio_automatico(cliente_rs, ejecutivo_id):
         siglas_e = str(info_e.get('SIGLAS', 'SEJ')).upper()[:3]
         sucursal = str(info_e.get('SUCURSAL', 'MX')).upper()[:2]
         
-        # 3. Fecha (YYMMDD)
-        fecha_str = date.today().strftime("%y%m%d")
+        # 3. Fecha (YYMMDD) usando hora de México
+        fecha_str = ahora_mexico().strftime("%y%m%d")
         
         # 4. Consecutivo (Basado en el historial)
         prefijo_busqueda = f"{siglas_c}-{siglas_e}-{fecha_str}-{sucursal}"
@@ -264,9 +293,8 @@ def generar_folio_automatico(cliente_rs, ejecutivo_id):
                 count += 1
         
         consecutivo = str(count).zfill(3)
-        
         return f"{prefijo_busqueda}-{consecutivo}"
-    except Exception as e:
+    except Exception:
         return ""
 
 # --- ESTILO DE ALTA DEFINICIÓN (PRO UI) ---
@@ -1234,7 +1262,6 @@ def buscar_en_todos_los_sheets(query):
 
     q_norm = normalizar(query)
     resultados = []
-    gc = conectar_google_sheets()
     resumen_escaneo = []
     
     with st.spinner("Escaneando ecosistema de proyectos..."):
@@ -1243,65 +1270,29 @@ def buscar_en_todos_los_sheets(query):
             sheet_id = str(u.get('ID_SHEET') or u.get('SPREADSHEET_ID') or "").strip()
             
             try:
-                # 1. Apertura del Sheet
-                sh_target = None
-                try:
-                    if sheet_id:
-                        sh_target = gc.open_by_key(sheet_id)
-                    else:
-                        sh_target = gc.open(f"COTIZACIONES_{u['USUARIO']}")
-                except:
-                    try:
-                        sh_target = gc.open(u['USUARIO'])
-                    except:
-                        pass
+                # USAR CACHÉ PARA EL ESCANEO
+                datos_dir = obtener_directorio_ejecutivo_cached(sheet_id, u['USUARIO'])
                 
-                if not sh_target:
-                    resumen_escaneo.append(f"❌ {nombre_ej}: Sin acceso")
-                    continue
+                if datos_dir:
+                    resumen_escaneo.append(f"✅ {nombre_ej}: {len(datos_dir)} reg.")
+                    for d in datos_dir:
+                        toda_la_fila = " ".join([str(v) for v in d.values()])
+                        if q_norm in normalizar(toda_la_fila):
+                            d_norm = {str(k).upper().replace(" ", "_"): v for k, v in d.items()}
+                            res_final = {
+                                'RAZON_SOCIAL': d_norm.get('RAZON_SOCIAL', d_norm.get('CLIENTE', 'N/A')),
+                                'CONTACTO': d_norm.get('CONTACTO', d_norm.get('ATENCION', 'N/A')),
+                                'EMAIL': d_norm.get('EMAIL', 'N/A'),
+                                'TELEFONO': d_norm.get('TELEFONO', 'N/A'),
+                                'EJECUTIVO_DUEÑO': nombre_ej
+                            }
+                            # No buscamos última actividad aquí para ahorrar cuota
+                            res_final['ULTIMA_ACTIVIDAD'] = "Ver en expediente"
+                            resultados.append(res_final)
+                else:
+                    resumen_escaneo.append(f"❌ {nombre_ej}: Sin acceso/datos")
 
-                # 2. Localización de la pestaña
-                ws_dir = None
-                for name in ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "HOJA1", "SHEET1"]:
-                    try:
-                        ws_dir = sh_target.worksheet(name)
-                        break
-                    except:
-                        continue
-                
-                if not ws_dir:
-                    resumen_escaneo.append(f"❓ {nombre_ej}: Sin pestaña")
-                    continue
-
-                # 3. Búsqueda de datos
-                datos_dir = ws_dir.get_all_records()
-                resumen_escaneo.append(f"✅ {nombre_ej}: {len(datos_dir)} reg.")
-                
-                for d in datos_dir:
-                    # Unir toda la fila para búsqueda profunda
-                    toda_la_fila = " ".join([str(v) for v in d.values()])
-                    if q_norm in normalizar(toda_la_fila):
-                        # Mapeo de campos normalizado
-                        d_norm = {str(k).upper().replace(" ", "_"): v for k, v in d.items()}
-                        res_final = {
-                            'RAZON_SOCIAL': d_norm.get('RAZON_SOCIAL', d_norm.get('CLIENTE', 'N/A')),
-                            'CONTACTO': d_norm.get('CONTACTO', d_norm.get('ATENCION', 'N/A')),
-                            'EMAIL': d_norm.get('EMAIL', 'N/A'),
-                            'TELEFONO': d_norm.get('TELEFONO', 'N/A'),
-                            'EJECUTIVO_DUEÑO': nombre_ej
-                        }
-                        
-                        # Intentar obtener la última actividad (Opcional)
-                        try:
-                            ws_res = sh_target.worksheet("COTIZACIONES_RESUMEN")
-                            recs_res = ws_res.get_all_records()
-                            res_final['ULTIMA_ACTIVIDAD'] = recs_res[-1].get('FECHA_ELABORACION', 'N/A') if recs_res else "Sin cotizaciones"
-                        except:
-                            res_final['ULTIMA_ACTIVIDAD'] = "N/A"
-                        
-                        resultados.append(res_final)
-
-            except Exception as e:
+            except Exception:
                 resumen_escaneo.append(f"❌ {nombre_ej}: Error en proceso")
                 continue 
     
@@ -1473,7 +1464,8 @@ else:
             col_acc1, col_acc2, _ = st.columns([1, 1, 1])
             with col_acc1:
                 if st.button("Crear Cotización Nueva", use_container_width=True, type="primary"):
-                    keys_to_reset = ['folio_val', 'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso']
+                    # LIMPIEZA TOTAL DE MEMORIA PARA NUEVA COTIZACIÓN
+                    keys_to_reset = ['folio_val', 'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso', 'cliente_sel', 'contacto_sel', 'ejecutivo_nom']
                     for k in keys_to_reset:
                         if k in st.session_state: del st.session_state[k]
                     st.session_state.menu_actual = 'nuevo'
@@ -1953,14 +1945,6 @@ else:
                     val_rs_actual = get_val('cliente_sel')
                     idx_rs = opciones_rs.index(val_rs_actual) if val_rs_actual in opciones_rs else 0
                     cliente_sel = st.selectbox("Razón Social:", opciones_rs, index=idx_rs, key="rs_sel_final")
-                    
-                    # DISPARADOR DE FOLIO
-                    if cliente_sel != "Seleccionar..." and cliente_sel != st.session_state.get('cliente_sel_ant'):
-                        if not st.session_state.get('folio_val'):
-                            with st.spinner("Calculando folio..."):
-                                nuevo_folio = generar_folio_automatico(cliente_sel, st.session_state.usuario)
-                                if nuevo_folio: st.session_state.folio_val = nuevo_folio
-                        st.session_state.cliente_sel_ant = cliente_sel
                     st.session_state.cliente_sel = cliente_sel
                 
                 with col_c2:
@@ -1975,10 +1959,22 @@ else:
                         st.selectbox("Atención a:", ["Seleccionar..."], disabled=True, key="cont_dis")
                         contacto_sel = "Seleccionar..."
 
+                # --- DISPARADOR DE FOLIO AUTOMÁTICO (UNIFICADO Y LIMPIO) ---
+                if (cliente_sel != "Seleccionar..." and ejecutivo_nom != "Seleccionar..." and 
+                    not st.session_state.get('folio_val')):
+                    with st.spinner("Generando folio oficial..."):
+                        # Obtener ID técnico del ejecutivo seleccionado
+                        ej_id_tech = next((u['USUARIO'] for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo_nom), st.session_state.usuario)
+                        nuevo_f = generar_folio_automatico(cliente_sel, ej_id_tech)
+                        if nuevo_f:
+                            st.session_state.folio_val = nuevo_f
+                            st.rerun() # Refrescar para que el folio aparezca abajo
+
                 st.divider()
                 col_f1, col_f2, col_f3, col_f4 = st.columns([1.5, 1, 1, 1])
                 with col_f1:
-                    folio = st.text_input("Folio de Cotización:", value=st.session_state.get('folio_val', ""), key="folio_inp_final")
+                    # USAR DIRECTAMENTE LA VARIABLE MAESTRA EN EL WIDGET
+                    folio = st.text_input("Folio de Cotización:", value=st.session_state.get('folio_val', ""), key="folio_val_widget")
                     st.session_state.folio_val = folio
                 
                 with col_f2:
