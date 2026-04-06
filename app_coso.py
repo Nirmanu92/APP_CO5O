@@ -1123,14 +1123,24 @@ def buscar_en_todos_los_sheets(query):
     with st.spinner("Escaneando ecosistema de proyectos..."):
         for u in st.session_state.usuarios_db:
             nombre_ej = u['NOMBRE']
-            sheet_id = u.get('ID_SHEET') or u.get('SPREADSHEET_ID')
-            if not sheet_id: continue
+            # Normalizar ID de la hoja
+            sheet_id = str(u.get('ID_SHEET') or u.get('SPREADSHEET_ID') or "").strip()
             
+            sh_target = None
             try:
-                sh_target = gc.open_by_key(sheet_id)
+                if sheet_id:
+                    sh_target = gc.open_by_key(sheet_id)
+                else:
+                    # Intento por nombre si no hay ID
+                    sh_target = gc.open(f"COTIZACIONES_{u['USUARIO']}")
+            except:
+                try: sh_target = gc.open(u['USUARIO']) # Segundo intento
+                except: pass
+            
+            if sh_target:
                 # Intentar varios nombres de pestañas comunes
                 ws_dir = None
-                for name in ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES"]:
+                for name in ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "HOJA1", "SHEET1"]:
                     try:
                         ws_dir = sh_target.worksheet(name)
                         break
@@ -1141,9 +1151,10 @@ def buscar_en_todos_los_sheets(query):
                     resumen_escaneo.append(f"✅ {nombre_ej}: {len(datos_dir)} reg.")
                     
                     for d in datos_dir:
-                        # UNIÓN TOTAL Y NORMALIZACIÓN
-                        texto_fila = " ".join([str(v) for v in d.values()])
-                        if q_norm in normalizar(texto_fila):
+                        # BÚSQUEDA PROFUNDA
+                        toda_la_fila = " ".join([str(v) for v in d.values()])
+                        if q_norm in normalizar(toda_la_fila):
+                            # ... (resto de la lógica de guardado de resultados se mantiene igual)
                             d_norm = {str(k).upper().replace(" ", "_"): v for k, v in d.items()}
                             res_final = {
                                 'RAZON_SOCIAL': d_norm.get('RAZON_SOCIAL', d_norm.get('CLIENTE', 'N/A')),
