@@ -211,7 +211,12 @@ def obtener_drive_service():
     return None
 
 # --- CONFIGURACIÓN UI ---
-st.set_page_config(page_title="CO5O - Registro Maestro", page_icon="ICONO.png", layout="wide", initial_sidebar_state="expanded")
+try:
+    from PIL import Image
+    img_favicon = Image.open("ICONO.png")
+    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon=img_favicon, layout="wide", initial_sidebar_state="expanded")
+except:
+    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon="ICONO.png", layout="wide", initial_sidebar_state="expanded")
 
 # --- GENERADOR DE FOLIO AUTOMÁTICO ---
 def generar_folio_automatico(cliente_rs, ejecutivo_id):
