@@ -1109,7 +1109,13 @@ def cargar_cotizacion_para_editar(row, df_resumen):
 
 # --- 3. BUSCADOR DE VÍNCULOS Y OPERACIONES (OVO) ---
 def buscar_en_todos_los_sheets(query):
-    """Busca coincidencias con diagnóstico profundo paso a paso."""
+    """Busca coincidencias ignorando acentos, puntuación y mayúsculas."""
+    import unicodedata
+    def normalizar(t):
+        if not t: return ""
+        return "".join(c for c in unicodedata.normalize('NFD', str(t)) if unicodedata.category(c) != 'Mn').upper()
+
+    q_norm = normalizar(query)
     resultados = []
     gc = conectar_google_sheets()
     resumen_escaneo = []
@@ -1132,15 +1138,12 @@ def buscar_en_todos_los_sheets(query):
                 
                 if ws_dir:
                     datos_dir = ws_dir.get_all_records()
-                    count_registros = len(datos_dir)
-                    resumen_escaneo.append(f"✅ {nombre_ej}: {count_registros} reg.")
+                    resumen_escaneo.append(f"✅ {nombre_ej}: {len(datos_dir)} reg.")
                     
                     for d in datos_dir:
-                        # BÚSQUEDA TOTAL: Unir todos los valores de la fila en un solo texto
-                        toda_la_fila = " ".join([str(v) for v in d.values()]).upper()
-                        
-                        if query.upper() in toda_la_fila:
-                            # Intentar normalizar nombres para la vista
+                        # UNIÓN TOTAL Y NORMALIZACIÓN
+                        texto_fila = " ".join([str(v) for v in d.values()])
+                        if q_norm in normalizar(texto_fila):
                             d_norm = {str(k).upper().replace(" ", "_"): v for k, v in d.items()}
                             res_final = {
                                 'RAZON_SOCIAL': d_norm.get('RAZON_SOCIAL', d_norm.get('CLIENTE', 'N/A')),
@@ -1154,17 +1157,14 @@ def buscar_en_todos_los_sheets(query):
                                 ws_res = sh_target.worksheet("COTIZACIONES_RESUMEN")
                                 resumenes = ws_res.get_all_records()
                                 res_final['ULTIMA_ACTIVIDAD'] = resumenes[-1].get('FECHA_ELABORACION', 'N/A') if resumenes else "Sin cotizaciones"
-                            except:
-                                res_final['ULTIMA_ACTIVIDAD'] = "N/A"
+                            except: res_final['ULTIMA_ACTIVIDAD'] = "N/A"
                             
                             resultados.append(res_final)
-                else:
-                    resumen_escaneo.append(f"❓ {nombre_ej}: Sin pestaña Directorio")
+                else: resumen_escaneo.append(f"❓ {nombre_ej}: Sin pestaña")
             except Exception:
                 resumen_escaneo.append(f"❌ {nombre_ej}: Sin acceso")
                 continue 
     
-    # Mostrar el mapa de lo que la App realmente está viendo
     with st.expander("Detalle del escaneo (Diagnóstico)"):
         st.write(" | ".join(resumen_escaneo))
     
