@@ -1109,12 +1109,15 @@ def cargar_cotizacion_para_editar(row, df_resumen):
 
 # --- 3. BUSCADOR DE VÍNCULOS Y OPERACIONES (OVO) ---
 def buscar_en_todos_los_sheets(query):
-    """Busca coincidencias en los directorios de todos los ejecutivos registrados."""
+    """Busca coincidencias con diagnóstico de errores de acceso."""
     resultados = []
     gc = conectar_google_sheets()
+    hojas_escaneadas = 0
+    errores_acceso = []
     
     with st.spinner("Escaneando ecosistema de proyectos..."):
         for u in st.session_state.usuarios_db:
+            nombre_ej = u['NOMBRE']
             sheet_id = u.get('ID_SHEET') or u.get('SPREADSHEET_ID')
             if not sheet_id: continue
             
@@ -1122,22 +1125,31 @@ def buscar_en_todos_los_sheets(query):
                 sh_target = gc.open_by_key(sheet_id)
                 ws_dir = sh_target.worksheet("DIRECTORIO")
                 datos_dir = ws_dir.get_all_records()
+                hojas_escaneadas += 1
                 
                 for d in datos_dir:
-                    search_str = f"{d.get('RAZON_SOCIAL', '')} {d.get('CONTACTO', '')}".upper()
-                    if query.upper() in search_str:
-                        d['EJECUTIVO_DUEÑO'] = u['NOMBRE']
+                    # Normalizar llaves para ignorar espacios y guiones
+                    d_norm = {str(k).upper().replace(" ", "_"): v for k, v in d.items()}
+                    
+                    razon = str(d_norm.get('RAZON_SOCIAL', d_norm.get('RAZON_SOCIAL_DEL_CLIENTE', ''))).upper()
+                    contacto = str(d_norm.get('CONTACTO', d_norm.get('ATENCION', ''))).upper()
+                    
+                    if query.upper() in razon or query.upper() in contacto:
+                        d['EJECUTIVO_DUEÑO'] = nombre_ej
                         try:
                             ws_res = sh_target.worksheet("COTIZACIONES_RESUMEN")
                             resumenes = ws_res.get_all_records()
-                            cliente_col = 'CLIENTE' if 'CLIENTE' in resumenes[0] else 'RAZON_SOCIAL'
-                            fechas = [r.get('FECHA_ELABORACION', '') for r in resumenes if str(r.get(cliente_col)) == str(d.get('RAZON_SOCIAL'))]
-                            d['ULTIMA_ACTIVIDAD'] = max(fechas) if fechas else "Sin cotizaciones"
+                            d['ULTIMA_ACTIVIDAD'] = resumenes[-1].get('FECHA_ELABORACION', 'N/A') if resumenes else "Sin cotizaciones"
                         except:
                             d['ULTIMA_ACTIVIDAD'] = "N/A"
                         resultados.append(d)
-            except:
+            except Exception:
+                errores_acceso.append(nombre_ej)
                 continue 
+    
+    if errores_acceso:
+        st.caption(f"ℹ️ Escaneo completado: {hojas_escaneadas} hojas revisadas. No se pudo acceder a las hojas de: {', '.join(errores_acceso)}.")
+    
     return resultados
 
 def renderizar_buscador_ovo():
