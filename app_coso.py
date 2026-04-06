@@ -246,64 +246,111 @@ def generar_folio_automatico(cliente_rs, ejecutivo_id):
     except Exception as e:
         return ""
 
-# --- ESTILO DE ALTA DEFINICIÓN (SHARPNESS) ---
+# --- ESTILO DE ALTA DEFINICIÓN (PRO UI) ---
 st.markdown("""
     <style>
-    /* Mejorar nitidez de texto global */
+    /* Importar Inter para un look más moderno */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
     html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif !important;
         -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: optimizeLegibility;
     }
 
-    /* Fondo Negro Absoluto y Texto Blanco */
+    /* Fondo Degradado Profundo */
     .stApp {
-        background-color: #030303;
-        color: #FFFFFF;
+        background: radial-gradient(circle at 50% 0%, #1a1f2c 0%, #050505 100%);
+        color: #E2E8F0;
     }
     
-    /* Centrar y ensanchar la lista de pestañas */
+    /* Pestañas Modernas */
     [data-baseweb="tab-list"] {
         justify-content: center !important;
-        gap: 30px !important;
+        gap: 20px !important;
         background-color: transparent !important;
+        padding-bottom: 20px;
     }
     
-    /* Hacer las pestañas más anchas y visibles */
     [data-baseweb="tab"] {
-        min-width: 220px !important;
+        min-width: 180px !important;
         text-align: center !important;
-        font-size: 18px !important;
-        padding: 12px 25px !important;
-        color: #A0A0A0 !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        padding: 10px 20px !important;
+        color: #94A3B8 !important;
+        border-radius: 8px 8px 0 0 !important;
+        transition: all 0.3s ease;
     }
     
     [aria-selected="true"] {
         color: #FFFFFF !important;
+        background: rgba(52, 152, 219, 0.1) !important;
         border-bottom: 3px solid #3498DB !important;
     }
 
-    /* Asegurar que las etiquetas sean blancas y nítidas */
-    label, p, h1, h2, h3 {
-        color: #FFFFFF !important;
-        font-weight: 400;
-    }
-
-    /* Optimizar nitidez del Banner */
-    [data-testid="stImage"] img {
-        image-rendering: -webkit-optimize-contrast;
-        image-rendering: crisp-edges;
-    }
-
-    /* Cambiar el color de enfoque (focus) de los inputs a Azul */
-    textarea:focus, input:focus, select:focus, div[data-baseweb="select"] > div:focus-within {
-        border-color: #3498DB !important;
-        box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.5) !important;
+    /* Tarjetas de Métricas (Glassmorphism) */
+    div[data-testid="metric-container"] {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.07) !important;
+        padding: 20px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        transition: transform 0.3s ease;
     }
     
-    /* Forzar el color de la línea de selección en widgets de Streamlit */
-    div[data-baseweb="input"] > div:focus-within {
+    div[data-testid="metric-container"]:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-color: rgba(52, 152, 219, 0.3) !important;
+    }
+
+    /* Botones Pro */
+    .stButton > button {
+        border-radius: 10px !important;
+        background: linear-gradient(135deg, #3498DB 0%, #2980B9 100%) !important;
+        color: white !important;
+        border: none !important;
+        padding: 12px 24px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.2) !important;
+    }
+
+    .stButton > button:hover {
+        box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4) !important;
+        transform: scale(1.02);
+    }
+
+    .stButton > button:active {
+        transform: scale(0.98);
+    }
+
+    /* Inputs y Selects */
+    div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
+        background-color: rgba(255, 255, 255, 0.02) !important;
+        border-radius: 10px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    textarea:focus, input:focus, div[data-baseweb="select"] > div:focus-within {
         border-color: #3498DB !important;
+        box-shadow: 0 0 0 1px #3498DB !important;
+    }
+
+    /* Scrollbar minimalista */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
     }
 
     #MainMenu {visibility: hidden;}
