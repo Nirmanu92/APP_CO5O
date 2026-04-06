@@ -210,7 +210,7 @@ def obtener_drive_service():
     return None
 
 # --- CONFIGURACIÓN UI ---
-st.set_page_config(page_title="CO5O - Registro Maestro", page_icon="LOGOPURO.png", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="CO5O - Registro Maestro", page_icon="ICONO.png", layout="wide", initial_sidebar_state="expanded")
 
 # --- GENERADOR DE FOLIO AUTOMÁTICO ---
 def generar_folio_automatico(cliente_rs, ejecutivo_id):
