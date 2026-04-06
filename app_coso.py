@@ -102,18 +102,29 @@ def obtener_directorio_ejecutivo_cached(sheet_id, usuario_id):
     try:
         gc = conectar_google_sheets()
         sh = None
-        if sheet_id and len(str(sheet_id)) > 10:
-            sh = gc.open_by_key(sheet_id)
-        else:
-            sh = gc.open(f"COTIZACIONES_{usuario_id}")
+        # Intentar abrir por ID si es válido (longitud típica de ID de Google > 20)
+        if sheet_id and len(str(sheet_id)) > 20:
+            try: sh = gc.open_by_key(sheet_id)
+            except: pass
+        
+        # Si no hay ID o falló, intentar por nombre estándar
+        if not sh:
+            try: sh = gc.open(f"COTIZACIONES_{usuario_id}")
+            except: 
+                try: sh = gc.open(str(usuario_id))
+                except: return None # No se encontró el archivo
             
-        for name in ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "HOJA1"]:
+        # Buscar en pestañas comunes de directorio
+        for name in ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "Contactos", "CONTACTOS", "HOJA1", "Hoja1"]:
             try:
-                return sh.worksheet(name).get_all_records()
+                data = sh.worksheet(name).get_all_records()
+                if data: return data
             except: continue
-    except:
-        return []
-    return []
+            
+        # Último recurso: primera hoja disponible
+        return sh.get_worksheet(0).get_all_records()
+    except Exception as e:
+        return None # Error de acceso o permisos
 
 # --- CARGA SÓLO USUARIOS PARA LOGIN ---
 def cargar_usuarios_login():
