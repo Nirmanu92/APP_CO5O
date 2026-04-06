@@ -1950,9 +1950,7 @@ else:
                     condic = st.selectbox("Condiciones Especiales:", ["Seleccionar..."] + opciones_cond, index=idx_c, key="condic_val_sel")
                     st.session_state.condic_val = condic
                 
-                val_coment = st.session_state.get('coment_val', "")
-                comentarios = st.text_area("Comentarios para el Resumen:", value=val_coment, key="coment_val_input")
-                st.session_state.coment_val = comentarios
+                # Comentarios eliminados de aquí (se movieron a Finalizar)
 
             with tab2:
                 st.subheader("Análisis de Partidas")
@@ -2148,6 +2146,10 @@ else:
                 st.write("**Conceptos a registrar:**", ", ".join(df_analisis["Concepto"].tolist()))
                 
                 st.divider()
+                val_coment = st.session_state.get('coment_val', "")
+                comentarios = st.text_area("✍️ Comentarios / Resumen Ejecutivo:", value=val_coment, key="coment_val_input", help="Estos comentarios se guardarán en el historial y son útiles para el seguimiento.")
+                st.session_state.coment_val = comentarios
+
                 if st.button("CONFIRMAR Y GUARDAR TODO", use_container_width=True, type="primary"):
                     if "Seleccionar..." in [ejecutivo_nom, cliente_sel, contacto_sel, entrega, pago, condic] or not st.session_state.folio_val:
                         st.error("Revisa que todos los campos obligatorios en 'Generales' estén llenos.")
