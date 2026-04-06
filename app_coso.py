@@ -1093,78 +1093,96 @@ def cargar_usuarios_login():
             st.error(f"Error cargando lista de acceso: {e}")
 
 def cargar_cotizacion_para_editar(row, df_resumen):
-    """Extrae toda la lógica de carga de una cotización para no repetir código en los botones."""
-    # 1. Identificar columnas
-    col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
-    col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
-    col_ej = 'EJECUTIVO' if 'EJECUTIVO' in df_resumen.columns else df_resumen.columns[1]
-
-    # 2. Limpieza de estados anteriores
+    """Extrae toda la lógica de carga de una cotización de forma robusta."""
+    # 1. Normalizar nombres de columnas del DataFrame de entrada
+    row_norm = {str(k).upper().replace(" ", "_"): v for k, v in row.items()}
+    
+    # 2. Identificar columnas clave
+    f_id = str(row_norm.get('FOLIO', next(iter(row.values()), ""))).strip()
+    
+    # 3. Limpieza de estados anteriores
     st.session_state.dict_fotos = {}
     st.session_state.dict_fotos_links = {}
+    st.session_state.dict_evidencias = {}
+    st.session_state.dict_evidencias_links = {}
     st.session_state.editor_key = st.session_state.get('editor_key', 0) + 1
+    
     for k in ['registro_exitoso', 'pedido_exitoso', 'pdf_actual', 'remision_actual', 'pdf_tecnico_actual', 'nombre_pdf']:
         if k in st.session_state: del st.session_state[k]
 
-    # 3. Carga de Cabecera
-    st.session_state.folio_val = str(row[col_folio])
-    st.session_state.ejecutivo_nom = str(row[col_ej])
-    st.session_state.cliente_sel = row[col_cliente]
-    st.session_state.contacto_sel = row.get('CONTACTO', "")
-    st.session_state.entrega_val = row.get('TIEMPO_DE_ENTREGA', "")
-    st.session_state.pago_val = row.get('FORMA_DE_PAGO', "")
-    st.session_state.condic_val = row.get('CONDICIONES', "")
-    st.session_state.coment_val = row.get('COMENTARIOS', "")
-    
+    # 4. Carga de Cabecera (Sincronización con Widgets)
+    st.session_state.folio_val = f_id
+    st.session_state.ejecutivo_nom = str(row_norm.get('EJECUTIVO', st.session_state.usuario))
+    st.session_state.cliente_sel = str(row_norm.get('CLIENTE', row_norm.get('RAZON_SOCIAL', 'Seleccionar...')))
+    st.session_state.contacto_sel = str(row_norm.get('CONTACTO', 'Seleccionar...'))
+    st.session_state.entrega_val = str(row_norm.get('TIEMPO_DE_ENTREGA', row_norm.get('ENTREGA', 'Seleccionar...')))
+    st.session_state.pago_val = str(row_norm.get('FORMA_DE_PAGO', row_norm.get('PAGO', 'Seleccionar...')))
+    st.session_state.condic_val = str(row_norm.get('CONDICIONES', row_norm.get('CONDICIONES_ESPECIALES', 'Seleccionar...')))
+    st.session_state.coment_val = str(row_norm.get('COMENTARIOS', row_norm.get('RESUMEN', '')))
+    st.session_state.moneda_val = str(row_norm.get('MONEDA', 'MXN'))
+    st.session_state.tc_val = float(row_norm.get('TC', row_norm.get('TIPO_DE_CAMBIO', 1.0)))
+
     try:
-        from datetime import datetime
-        st.session_state.vigencia_val = datetime.strptime(str(row.get('VIGENCIA')), "%Y-%m-%d").date()
+        val_v = str(row_norm.get('VIGENCIA', ''))
+        st.session_state.vigencia_val = datetime.strptime(val_v, "%Y-%m-%d").date() if "-" in val_v else date.today()
     except:
         st.session_state.vigencia_val = date.today()
 
-    # 4. Carga de Partidas
+    # 5. Carga de Partidas (Detalle)
     try:
         ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
         todas_p = ws_det.get_all_records()
-        partidas = [p for p in todas_p if str(p.get(col_folio)) == str(row[col_folio])]
+        
+        # Filtrar partidas por folio (normalizando ambos para comparar)
+        partidas = [p for p in todas_p if str(next(iter(p.values()), "")).strip() == f_id]
         
         if partidas:
             df_edit = pd.DataFrame(partidas)
+            # Normalizar columnas del detalle
             mapa_cols = {
                 "CONCEPTO": "Concepto", "DESCRIPCION": "Descripción", "PZAS": "Pzas", "CANTIDAD": "Pzas",
                 "SKU": "SKU", "FOLIO_PROVEEDOR": "Folio Prov", "PRECIO_PROVEEDOR": "PM",
                 "PROVEEDOR": "Proveedor", "LINK": "Link", "ENVIO_PROVEEDOR": "Envio Prov",
                 "ENVIO_SECUNDARIO": "Envio Sec", "UTILIDAD%": "Util %", "FOTO_LINK": "Foto_Link",
-                "FINANCIAMIENTO": "Financiamiento", "FINANCIERA": "Financiera", "EVIDENCIA_LINK": "Evidencia_Link"
+                "FINANCIAMIENTO": "Financiamiento", "FINANCIERA": "Financiera", "EVIDENCIA_LINK": "Evidencia_Link",
+                "MONEDA_ITEM": "Moneda"
             }
-            df_edit = df_edit.rename(columns={k: v for k, v in mapa_cols.items() if k in df_edit.columns})
+            # Renombrar usando una búsqueda insensible
+            new_cols = {}
+            for c in df_edit.columns:
+                c_norm = str(c).upper().replace(" ", "_")
+                if c_norm in mapa_cols:
+                    new_cols[c] = mapa_cols[c_norm]
             
-            # Asegurar columnas nuevas si no existen
-            if "Financiamiento" not in df_edit.columns: df_edit["Financiamiento"] = "Sin Financiera"
-            if "Financiera" not in df_edit.columns: df_edit["Financiera"] = "N/A"
-            if "Evidencia_Link" not in df_edit.columns: df_edit["Evidencia_Link"] = ""
+            df_edit = df_edit.rename(columns=new_cols)
             
-            # Asegurar columna Tipo si existe en el DB
-            if "TIPO" in [c.upper() for c in partidas[0].keys()]:
-                col_tipo_db = next(c for c in partidas[0].keys() if c.upper() == "TIPO")
-                df_edit["Tipo"] = df_edit[col_tipo_db]
-            else:
-                df_edit["Tipo"] = "PARTIDA"
+            # Asegurar columnas mínimas para el editor
+            cols_necesarias = ["Tipo", "Moneda", "Concepto", "Descripción", "Pzas", "SKU", "PM", "Proveedor", "Folio Prov", "Link", "Envio Prov", "Envio Sec", "Util %", "Financiamiento", "Financiera"]
+            for c in cols_necesarias:
+                if c not in df_edit.columns:
+                    if c == "Tipo": df_edit[c] = "PARTIDA"
+                    elif c == "Moneda": df_edit[c] = "MXN"
+                    elif c == "Util %": df_edit[c] = 15.0
+                    elif c == "Pzas": df_edit[c] = 1
+                    elif c in ["PM", "Envio Prov", "Envio Sec"]: df_edit[c] = 0.0
+                    elif c == "Financiamiento": df_edit[c] = "Sin Financiera"
+                    elif c == "Financiera": df_edit[c] = "N/A"
+                    else: df_edit[c] = ""
 
+            # Carga de links para visualización
             if "Foto_Link" in df_edit.columns:
                 st.session_state.dict_fotos_links = {idx: r["Foto_Link"] for idx, r in df_edit.iterrows() if r["Foto_Link"]}
-            
             if "Evidencia_Link" in df_edit.columns:
                 st.session_state.dict_evidencias_links = {idx: r["Evidencia_Link"] for idx, r in df_edit.iterrows() if r["Evidencia_Link"]}
 
+            # Normalizar Margen % (de decimal 0.15 a 15.0)
             if "Util %" in df_edit.columns:
                 df_edit["Util %"] = pd.to_numeric(df_edit["Util %"], errors='coerce').fillna(0)
                 if df_edit["Util %"].max() <= 1.0: df_edit["Util %"] = (df_edit["Util %"] * 100).round(1)
             
-            cols_n = ["Concepto", "Descripción", "Pzas", "SKU", "PM", "Proveedor", "Folio Prov", "Link", "Envio Prov", "Envio Sec", "Util %"]
-            st.session_state.df_partidas = df_edit[cols_n]
-    except:
-        pass
+            st.session_state.df_partidas = df_edit[cols_necesarias]
+    except Exception as e:
+        st.error(f"Error cargando detalle: {e}")
 
 # --- 3. BUSCADOR DE VÍNCULOS Y OPERACIONES (OVO) ---
 def buscar_en_todos_los_sheets(query):
