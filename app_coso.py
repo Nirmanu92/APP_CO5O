@@ -9,7 +9,8 @@ from datetime import date, datetime, timedelta, timezone
 # --- HELPER: TIEMPO LOCAL (CDMX) ---
 def ahora_mexico():
     """Retorna datetime actual ajustado a Ciudad de México (UTC-6)."""
-    return datetime.now(timezone(timedelta(hours=-6)))
+    # Forzar UTC y luego convertir a CDMX para evitar desfasamientos por zona horaria del servidor
+    return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-6)))
 
 import pandas as pd
 import plotly.express as px
@@ -1874,22 +1875,32 @@ else:
                 st.subheader("Datos del Emisor y Cliente")
                 col_e1, col_e2, col_e3 = st.columns(3)
                 
-                def buscar_index(lista, valor):
-                    if not valor or valor == "Seleccionar..." or valor not in lista: return 0
-                    try: return lista.index(valor) + 1 # +1 por el prefijo "Seleccionar..."
-                    except: return 0
+                # Función de búsqueda de valor seguro (evita errores de índice)
+                def get_val(key, default="Seleccionar..."):
+                    val = st.session_state.get(key, default)
+                    return val if val else default
 
                 with col_e1:
-                    ejecutivos_lista = [u['NOMBRE'] for u in st.session_state.usuarios_db]
-                    val_ej_actual = st.session_state.get('ejecutivo_nom', 'Seleccionar...')
-                    idx_ej = buscar_index(ejecutivos_lista, val_ej_actual)
-                    ejecutivo_nom = st.selectbox("Ejecutivo que firma:", ["Seleccionar..."] + ejecutivos_lista, index=idx_ej, key="ejecutivo_sel_widget")
+                    ejecutivos_lista = sorted([u['NOMBRE'] for u in st.session_state.usuarios_db])
+                    opciones_ej = ["Seleccionar..."] + ejecutivos_lista
+                    
+                    val_ej_actual = get_val('ejecutivo_nom')
+                    # Traducción de ID a Nombre si es necesario
+                    if val_ej_actual != "Seleccionar..." and val_ej_actual not in opciones_ej:
+                        nombre_match = next((u['NOMBRE'] for u in st.session_state.usuarios_db if u['USUARIO'] == val_ej_actual), None)
+                        if nombre_match: val_ej_actual = nombre_match
+                    
+                    # Usar index=0 y manejar el valor inicial vía session_state para evitar colapsos
+                    idx_ej = opciones_ej.index(val_ej_actual) if val_ej_actual in opciones_ej else 0
+                    ejecutivo_nom = st.selectbox("Ejecutivo que firma:", opciones_ej, index=idx_ej, key="ej_sel_final")
                     st.session_state.ejecutivo_nom = ejecutivo_nom
                 
                 v_tel, v_mail = ("", "")
                 if ejecutivo_nom != "Seleccionar...":
-                    d = next(u for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo_nom)
-                    v_tel, v_mail = d['TELEFONO'], d['EMAIL']
+                    try:
+                        d = next(u for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo_nom)
+                        v_tel, v_mail = d.get('TELEFONO', ''), d.get('EMAIL', '')
+                    except: pass
 
                 with col_e2:
                     tel_e = st.text_input("Teléfono:", value=v_tel)
@@ -1900,43 +1911,43 @@ else:
                 col_c1, col_c2 = st.columns(2)
                 with col_c1:
                     lista_rs = sorted(list(set([c['RAZON_SOCIAL'] for c in st.session_state.directorio if c['RAZON_SOCIAL']])))
-                    idx_rs = buscar_index(lista_rs, st.session_state.get('cliente_sel'))
-                    cliente_sel = st.selectbox("Razón Social:", ["Seleccionar..."] + lista_rs, index=idx_rs, key="cliente_sel_widget")
+                    opciones_rs = ["Seleccionar..."] + lista_rs
+                    val_rs_actual = get_val('cliente_sel')
+                    idx_rs = opciones_rs.index(val_rs_actual) if val_rs_actual in opciones_rs else 0
+                    cliente_sel = st.selectbox("Razón Social:", opciones_rs, index=idx_rs, key="rs_sel_final")
                     
-                    # DISPARADOR DE FOLIO AUTOMÁTICO
+                    # DISPARADOR DE FOLIO
                     if cliente_sel != "Seleccionar..." and cliente_sel != st.session_state.get('cliente_sel_ant'):
-                        with st.spinner("Calculando nuevo folio..."):
-                            nuevo_folio = generar_folio_automatico(cliente_sel, st.session_state.usuario)
-                            if nuevo_folio:
-                                st.session_state.folio_val = nuevo_folio
-                                st.session_state.cliente_sel_ant = cliente_sel
-                                st.rerun()
-                    
+                        if not st.session_state.get('folio_val'):
+                            with st.spinner("Calculando folio..."):
+                                nuevo_folio = generar_folio_automatico(cliente_sel, st.session_state.usuario)
+                                if nuevo_folio: st.session_state.folio_val = nuevo_folio
+                        st.session_state.cliente_sel_ant = cliente_sel
                     st.session_state.cliente_sel = cliente_sel
                 
                 with col_c2:
-                    opciones_c = ["Seleccionar..."]
                     if cliente_sel != "Seleccionar...":
-                        contactos = [c['CONTACTO'] for c in st.session_state.directorio if c['RAZON_SOCIAL'] == cliente_sel]
-                        opciones_c += contactos
-                        idx_cont = buscar_index(contactos, st.session_state.get('contacto_sel'))
-                        contacto_sel = st.selectbox("Atención a:", opciones_c, index=idx_cont, key="contacto_sel_widget")
+                        contactos = sorted(list(set([c['CONTACTO'] for c in st.session_state.directorio if c['RAZON_SOCIAL'] == cliente_sel])))
+                        opciones_c = ["Seleccionar..."] + contactos
+                        val_c_actual = get_val('contacto_sel')
+                        idx_c = opciones_c.index(val_c_actual) if val_c_actual in opciones_c else 0
+                        contacto_sel = st.selectbox("Atención a:", opciones_c, index=idx_c, key="cont_sel_final")
                         st.session_state.contacto_sel = contacto_sel
                     else:
-                        st.selectbox("Atención a:", ["Seleccionar..."], disabled=True)
+                        st.selectbox("Atención a:", ["Seleccionar..."], disabled=True, key="cont_dis")
                         contacto_sel = "Seleccionar..."
 
                 st.divider()
                 col_f1, col_f2, col_f3, col_f4 = st.columns([1.5, 1, 1, 1])
                 with col_f1:
-                    # Usar directamente st.session_state.folio_val en el widget
-                    if 'folio_val' not in st.session_state: st.session_state.folio_val = ""
-                    folio = st.text_input("Folio de Cotización:", key="folio_val")
+                    folio = st.text_input("Folio de Cotización:", value=st.session_state.get('folio_val', ""), key="folio_inp_final")
+                    st.session_state.folio_val = folio
                 
                 with col_f2:
                     moneda_opciones = ["MXN", "USD"]
-                    idx_moneda = buscar_index(moneda_opciones, st.session_state.get('moneda_val', 'MXN'))
-                    moneda = st.selectbox("Moneda Cotización:", moneda_opciones, index=idx_moneda, key="moneda_val_sel")
+                    val_mon_actual = st.session_state.get('moneda_val', 'MXN')
+                    idx_m = moneda_opciones.index(val_mon_actual) if val_mon_actual in moneda_opciones else 0
+                    moneda = st.selectbox("Moneda Cotización:", moneda_opciones, index=idx_m, key="mon_sel_final")
                     st.session_state.moneda_val = moneda
 
                 with col_f3:
