@@ -1290,14 +1290,19 @@ def renderizar_buscador_ovo():
         if st.session_state.menu_actual == 'menu':
             st.title(f"Panel de Control - {st.session_state.usuario}")
             
-            # 1. BOTÓN DE ACCIÓN PRINCIPAL
-            col_acc, _ = st.columns([1, 2])
-            with col_acc:
+            # 1. BOTONES DE ACCIÓN
+            col_acc1, col_acc2, _ = st.columns([1, 1, 1])
+            with col_acc1:
                 if st.button("Crear Cotización Nueva", use_container_width=True, type="primary"):
                     keys_to_reset = ['folio_val', 'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso']
                     for k in keys_to_reset:
                         if k in st.session_state: del st.session_state[k]
                     st.session_state.menu_actual = 'nuevo'
+                    st.rerun()
+            
+            with col_acc2:
+                if st.button("Buscador de Vínculos y Operaciones", use_container_width=True):
+                    st.session_state.menu_actual = 'ovo'
                     st.rerun()
             
             st.divider()
