@@ -12,6 +12,16 @@ def ahora_mexico():
     # Forzar UTC y luego convertir a CDMX para evitar desfasamientos por zona horaria del servidor
     return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-6)))
 
+def buscar_index(lista_completa, valor_buscado):
+    """Retorna el índice exacto de un valor dentro de la lista que recibirá el widget."""
+    if not valor_buscado or str(valor_buscado).strip() == "" or str(valor_buscado) == "Seleccionar...":
+        return 0
+    v_norm = str(valor_buscado).strip().upper()
+    for i, item in enumerate(lista_completa):
+        if str(item).strip().upper() == v_norm:
+            return i
+    return 0
+
 import pandas as pd
 import plotly.express as px
 from fpdf import FPDF
