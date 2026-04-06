@@ -6,6 +6,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2.credentials import Credentials as UserCredentials
 from datetime import date, datetime
 import pandas as pd
+import plotly.express as px
 from fpdf import FPDF
 import io
 import os
@@ -1334,9 +1335,21 @@ if not st.session_state.autenticado:
                 st.image("CONSULTINGLOGO.png", use_container_width=True)
     st.stop()
 else:
-    # --- MOSTRAR BANNER TOP ---
-    if os.path.exists("BANNER_TOP.png"):
-        st.image("BANNER_TOP.png", use_container_width=True)
+    # --- MOSTRAR BANNER DINÁMICO ---
+    def obtener_banner_dinamico():
+        hora = datetime.now().hour
+        if 6 <= hora < 12: prefijo = "DIA"
+        elif 12 <= hora < 19: prefijo = "TARDE"
+        else: prefijo = "NOCHE"
+        
+        # Intentar banner específico por horario, si no el general
+        for b in [f"BANNER_{prefijo}.png", "BANNER_TOP.png"]:
+            if os.path.exists(b): return b
+        return None
+
+    banner = obtener_banner_dinamico()
+    if banner:
+        st.image(banner, use_container_width=True)
     
     # --- ACTIVACIÓN DE CARGA POST-LOGIN ---
     cargar_datos_sesion_usuario()
@@ -1438,6 +1451,69 @@ else:
                     util_activa = df_activos_stats['UTILIDAD_TOTAL'].sum()
                     monto_ganado = df_stats[df_stats['ESTATUS'].isin(["100% Ganada", "100% Pedido"])]['MONTO_TOTAL'].sum()
                     
+                    # --- BLOQUE DE INTELIGENCIA VISUAL (NUEVO) ---
+                    st.markdown("### 🚀 Vista Rápida")
+                    
+                    # 1. Tarjetas de Proyectos Recientes
+                    df_recientes = df_stats.iloc[::-1].head(3)
+                    c_rec = st.columns(3)
+                    for idx_r, (_, row_r) in enumerate(df_recientes.iterrows()):
+                        with c_rec[idx_r]:
+                            color_st = "#3498DB" if "Propuesta" in row_r['ESTATUS'] else ("#2ECC71" if "Ganada" in row_r['ESTATUS'] else "#94A3B8")
+                            st.markdown(f"""
+                            <div style='background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px;'>
+                                <p style='margin:0; font-size: 12px; color: #94A3B8;'>{row_r[col_folio]}</p>
+                                <p style='margin:0; font-size: 16px; font-weight: bold;'>{row_r[col_cliente][:20]}...</p>
+                                <p style='margin:0; font-size: 14px; color: {color_st}; font-weight: bold;'>{row_r['ESTATUS']}</p>
+                                <p style='margin:0; font-size: 18px; margin-top: 10px;'>$ {row_r['MONTO_TOTAL']:,.2f}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    
+                    st.write("")
+                    
+                    # 2. Gráfico de Pipeline (Tubería)
+                    col_g1, col_g2 = st.columns([2, 1])
+                    with col_g1:
+                        # Agrupar por estatus para el gráfico
+                        df_pipe = df_stats.groupby('ESTATUS')['MONTO_TOTAL'].sum().reset_index()
+                        # Ordenar por importancia de estatus (aproximado)
+                        orden_estatus = ["10% Prospecto", "30% Levantamiento", "60% Propuesta", "90% Negociación", "100% Ganada", "100% Pedido", "0% Cancelada"]
+                        df_pipe['ESTATUS'] = pd.Categorical(df_pipe['ESTATUS'], categories=orden_estatus, ordered=True)
+                        df_pipe = df_pipe.sort_values('ESTATUS')
+                        
+                        fig = px.bar(df_pipe, x='ESTATUS', y='MONTO_TOTAL', 
+                                    title="Distribución de la Tubería (Monto)",
+                                    color='ESTATUS',
+                                    color_discrete_sequence=px.colors.sequential.Blues_r)
+                        
+                        fig.update_layout(
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            font_color='#E2E8F0',
+                            xaxis_title="",
+                            yaxis_title="Monto ($)",
+                            showlegend=False,
+                            height=350
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with col_g2:
+                        # Gráfico de dona: Proporción de clientes
+                        df_pie = df_stats[col_cliente].value_counts().head(5).reset_index()
+                        df_pie.columns = ['Cliente', 'Cant']
+                        fig_pie = px.pie(df_pie, values='Cant', names='Cliente', 
+                                       title="Top 5 Clientes",
+                                       hole=0.6,
+                                       color_discrete_sequence=px.colors.sequential.Aggrnyl)
+                        fig_pie.update_layout(
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            font_color='#E2E8F0',
+                            showlegend=False,
+                            height=350
+                        )
+                        st.plotly_chart(fig_pie, use_container_width=True)
+
                     st.subheader("Tu Inteligencia de Negocio")
                     m1, m2, m3, m4 = st.columns(4)
                     with m1: st.metric("Ventas Activas", f"$ {monto_activo:,.0f}", help="Valor total en la tubería")
