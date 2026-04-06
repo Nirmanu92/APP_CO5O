@@ -1380,8 +1380,11 @@ else:
                 st.markdown(f"<p style='text-align: center; font-size: 16px; margin-top: 5px; color: #3498DB;'><b>EJECUTIVO: {nombre_ej.upper()}</b></p>", unsafe_allow_html=True)
 
             with col_nav3:
-                hora_actual = datetime.now().strftime("%H:%M")
-                st.markdown(f"<p style='text-align: center; font-size: 16px; margin-top: 5px;'>{hora_actual} HRS</p>", unsafe_allow_html=True)
+                # Mostrar fecha actual en lugar de hora (que suele fallar por zona horaria en la nube)
+                meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+                ahora = datetime.now()
+                fecha_str = f"{ahora.day} de {meses[ahora.month-1]}, {ahora.year}"
+                st.markdown(f"<p style='text-align: center; font-size: 16px; margin-top: 5px; color: #94A3B8;'>{fecha_str}</p>", unsafe_allow_html=True)
 
             with col_nav4:
                 if st.button("CERRAR SESION", use_container_width=True):
