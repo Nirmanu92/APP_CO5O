@@ -1169,14 +1169,19 @@ def cargar_cotizacion_para_editar(row, df_resumen):
 
     # 4. Carga de Cabecera (Sincronización con Widgets)
     st.session_state.folio_val = f_id
+    st.session_state.folio_original_edicion = f_id
     
     # Ejecutivo: nombre o posición 1
     ej_val = row_norm.get('EJECUTIVO') or (row_list[1] if len(row_list)>1 else None)
-    st.session_state.ejecutivo_nom = str(ej_val) if ej_val else st.session_state.usuario
+    ej_nom_cargado = str(ej_val) if ej_val else st.session_state.usuario
+    st.session_state.ejecutivo_nom = ej_nom_cargado
+    st.session_state.ultimo_ejecutivo_folio = ej_nom_cargado
     
     # Cliente: nombre o posición 6
     cli_val = row_norm.get('CLIENTE') or row_norm.get('RAZON_SOCIAL') or (row_list[6] if len(row_list)>6 else None)
-    st.session_state.cliente_sel = str(cli_val) if cli_val else 'Seleccionar...'
+    cli_nom_cargado = str(cli_val) if cli_val else 'Seleccionar...'
+    st.session_state.cliente_sel = cli_nom_cargado
+    st.session_state.ultimo_cliente_folio = cli_nom_cargado
     
     # Contacto: nombre o posición 7
     cont_val = row_norm.get('CONTACTO') or (row_list[7] if len(row_list)>7 else None)
@@ -1482,7 +1487,12 @@ else:
             with col_acc1:
                 if st.button("Crear Cotización Nueva", use_container_width=True, type="primary"):
                     # LIMPIEZA TOTAL DE MEMORIA PARA NUEVA COTIZACIÓN
-                    keys_to_reset = ['folio_val', 'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso', 'cliente_sel', 'contacto_sel', 'ejecutivo_nom']
+                    keys_to_reset = [
+                        'folio_val', 'folio_original_edicion', 'ultimo_cliente_folio', 'ultimo_ejecutivo_folio',
+                        'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 
+                        'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso', 
+                        'cliente_sel', 'contacto_sel', 'ejecutivo_nom'
+                    ]
                     for k in keys_to_reset:
                         if k in st.session_state: del st.session_state[k]
                     st.session_state.menu_actual = 'nuevo'
@@ -1976,15 +1986,21 @@ else:
 
                 # --- LÓGICA DE FOLIO SÚPER-DIRECTA (SIN CALLBACKS) ---
                 if cliente_sel != "Seleccionar..." and ejecutivo_nom != "Seleccionar...":
-                    # Si no hay folio o si el cliente cambió, generar uno nuevo
-                    if not st.session_state.get('folio_val') or st.session_state.get('ultimo_cliente_folio') != cliente_sel:
-                        # Evitar bucle infinito: solo si no es edición
-                        if 'folio_original_edicion' not in st.session_state:
-                            ej_id = next((u['USUARIO'] for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo_nom), st.session_state.usuario)
+                    # Detectar si el cliente o el ejecutivo cambiaron para regenerar folio automáticamente
+                    cambio_cliente = st.session_state.get("ultimo_cliente_folio") != cliente_sel
+                    cambio_ejecutivo = st.session_state.get("ultimo_ejecutivo_folio") != ejecutivo_nom
+                    
+                    if not st.session_state.get("folio_val") or cambio_cliente or cambio_ejecutivo:
+                        # Solo generar automáticamente si no estamos en modo edición de una cotización existente
+                        if "folio_original_edicion" not in st.session_state:
+                            ej_id = next((u["USUARIO"] for u in st.session_state.usuarios_db if u["NOMBRE"] == ejecutivo_nom), st.session_state.usuario)
                             nuevo_f = generar_folio_automatico(cliente_sel, ej_id)
                             if nuevo_f:
                                 st.session_state.folio_val = nuevo_f
+                                st.session_state.folio_widget_input = nuevo_f  # Actualizar widget directamente
                                 st.session_state.ultimo_cliente_folio = cliente_sel
+                                st.session_state.ultimo_ejecutivo_folio = ejecutivo_nom
+                                st.rerun()  # Forzar recarga para mostrar el folio generado
 
                 st.divider()
                 col_f1, col_f2, col_f3, col_f4 = st.columns([1.5, 1, 1, 1])
