@@ -1226,10 +1226,18 @@ else:
                     col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
                     col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
                     
-                    # 1. Unir Resumen con montos y utilidad del Detalle
-                    df_montos_util = df_det_all.groupby(df_det_all.columns[0]).agg({
-                        'PFACTURA_TOTAL_IVA_INC': 'sum' if 'PFACTURA_TOTAL_IVA_INC' in df_det_all.columns else lambda x: pd.to_numeric(x, errors='coerce').sum(),
-                        'UTILIDAD_TOTAL': 'sum' if 'UTILIDAD_TOTAL' in df_det_all.columns else lambda x: pd.to_numeric(x, errors='coerce').sum()
+                    # Normalizar nombres de columnas del detalle para el cálculo
+                    df_det_norm = df_det_all.copy()
+                    df_det_norm.columns = [c.upper().replace(" ", "_") for c in df_det_norm.columns]
+                    col_folio_det = df_det_norm.columns[0]
+                    
+                    # Identificar columnas de monto y utilidad de forma robusta
+                    col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL_CON_IVA" in c or "PFACTURA_TOTAL_IVA_INC" in c), df_det_norm.columns[-3])
+                    col_util_src = next((c for c in df_det_norm.columns if "UTILIDAD_TOTAL" in c), df_det_norm.columns[-1])
+
+                    df_montos_util = df_det_norm.groupby(col_folio_det).agg({
+                        col_monto_src: lambda x: pd.to_numeric(x, errors='coerce').sum(),
+                        col_util_src: lambda x: pd.to_numeric(x, errors='coerce').sum()
                     }).reset_index()
                     df_montos_util.columns = [col_folio, 'MONTO_TOTAL', 'UTILIDAD_TOTAL']
                     
