@@ -1052,6 +1052,21 @@ def obtener_primera_fila_vacia(ws):
     except:
         return 1
 
+# --- 2. FUNCIONES DE APOYO (UI) ---
+def trigger_generar_folio():
+    """Callback disparado al cambiar ejecutivo o cliente para generar folio instantáneo."""
+    ej_nom = st.session_state.get('ej_sel_final')
+    cli_rs = st.session_state.get('rs_sel_final')
+    
+    if ej_nom and cli_rs and ej_nom != "Seleccionar..." and cli_rs != "Seleccionar...":
+        # Evitar generar si ya hay un folio (protección para edición)
+        if not st.session_state.get('folio_val'):
+            # Buscar ID técnico del ejecutivo
+            ej_id = next((u['USUARIO'] for u in st.session_state.usuarios_db if u['NOMBRE'] == ej_nom), st.session_state.usuario)
+            nuevo_f = generar_folio_automatico(cli_rs, ej_id)
+            if nuevo_f:
+                st.session_state.folio_val = nuevo_f
+
 def cargar_datos_sesion_usuario():
     """Carga los datos específicos del usuario una vez autenticado."""
     if st.session_state.get('datos_usuario_listos'):
@@ -1915,14 +1930,13 @@ else:
                     opciones_ej = ["Seleccionar..."] + ejecutivos_lista
                     
                     val_ej_actual = get_val('ejecutivo_nom')
-                    # Traducción de ID a Nombre si es necesario
                     if val_ej_actual != "Seleccionar..." and val_ej_actual not in opciones_ej:
                         nombre_match = next((u['NOMBRE'] for u in st.session_state.usuarios_db if u['USUARIO'] == val_ej_actual), None)
                         if nombre_match: val_ej_actual = nombre_match
                     
-                    # Usar index=0 y manejar el valor inicial vía session_state para evitar colapsos
                     idx_ej = opciones_ej.index(val_ej_actual) if val_ej_actual in opciones_ej else 0
-                    ejecutivo_nom = st.selectbox("Ejecutivo que firma:", opciones_ej, index=idx_ej, key="ej_sel_final")
+                    # AGREGADO: on_change para disparo instantáneo
+                    ejecutivo_nom = st.selectbox("Ejecutivo que firma:", opciones_ej, index=idx_ej, key="ej_sel_final", on_change=trigger_generar_folio)
                     st.session_state.ejecutivo_nom = ejecutivo_nom
                 
                 v_tel, v_mail = ("", "")
@@ -1944,7 +1958,8 @@ else:
                     opciones_rs = ["Seleccionar..."] + lista_rs
                     val_rs_actual = get_val('cliente_sel')
                     idx_rs = opciones_rs.index(val_rs_actual) if val_rs_actual in opciones_rs else 0
-                    cliente_sel = st.selectbox("Razón Social:", opciones_rs, index=idx_rs, key="rs_sel_final")
+                    # AGREGADO: on_change para disparo instantáneo
+                    cliente_sel = st.selectbox("Razón Social:", opciones_rs, index=idx_rs, key="rs_sel_final", on_change=trigger_generar_folio)
                     st.session_state.cliente_sel = cliente_sel
                 
                 with col_c2:
