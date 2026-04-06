@@ -1927,6 +1927,33 @@ else:
                     val = st.session_state.get(key, default)
                     return val if val else default
 
+                with col_e1:
+                    ejecutivos_lista = sorted([u['NOMBRE'] for u in st.session_state.usuarios_db])
+                    opciones_ej = ["Seleccionar..."] + ejecutivos_lista
+                    val_ej_actual = get_val('ejecutivo_nom')
+                    
+                    if val_ej_actual != "Seleccionar..." and val_ej_actual not in opciones_ej:
+                        nombre_match = next((u['NOMBRE'] for u in st.session_state.usuarios_db if u['USUARIO'] == val_ej_actual), None)
+                        if nombre_match: val_ej_actual = nombre_match
+                    
+                    idx_ej = opciones_ej.index(val_ej_actual) if val_ej_actual in opciones_ej else 0
+                    ejecutivo_nom = st.selectbox("Ejecutivo que firma:", opciones_ej, index=idx_ej, key="ej_sel_final")
+                    st.session_state.ejecutivo_nom = ejecutivo_nom
+                
+                v_tel, v_mail = ("", "")
+                if ejecutivo_nom != "Seleccionar...":
+                    try:
+                        d = next(u for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo_nom)
+                        v_tel, v_mail = d.get('TELEFONO', ''), d.get('EMAIL', '')
+                    except: pass
+
+                with col_e2:
+                    tel_e = st.text_input("Teléfono:", value=v_tel)
+                with col_e3:
+                    mail_e = st.text_input("Email:", value=v_mail)
+
+                st.divider()
+                col_c1, col_c2 = st.columns(2)
                 with col_c1:
                     lista_rs = sorted(list(set([c['RAZON_SOCIAL'] for c in st.session_state.directorio if c['RAZON_SOCIAL']])))
                     opciones_rs = ["Seleccionar..."] + lista_rs
