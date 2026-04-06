@@ -1107,10 +1107,10 @@ def cargar_cotizacion_para_editar(row, df_resumen):
     """Extrae toda la lógica de carga de una cotización de forma robusta."""
     # 1. Normalizar nombres de columnas del DataFrame de entrada
     row_norm = {str(k).upper().replace(" ", "_"): v for k, v in row.items()}
+    row_list = list(row.values) if hasattr(row, 'values') else list(row)
     
     # 2. Identificar columnas clave (Folio)
-    # Evitamos row.values() porque en Series de Pandas .values es un atributo, no una función.
-    f_id = str(row_norm.get('FOLIO', list(row)[0] if len(row)>0 else "")).strip()
+    f_id = str(row_norm.get('FOLIO', row_list[0] if len(row_list)>0 else "")).strip()
     
     # 3. Limpieza de estados anteriores
     st.session_state.dict_fotos = {}
@@ -1124,18 +1124,46 @@ def cargar_cotizacion_para_editar(row, df_resumen):
 
     # 4. Carga de Cabecera (Sincronización con Widgets)
     st.session_state.folio_val = f_id
-    st.session_state.ejecutivo_nom = str(row_norm.get('EJECUTIVO', st.session_state.usuario))
-    st.session_state.cliente_sel = str(row_norm.get('CLIENTE', row_norm.get('RAZON_SOCIAL', 'Seleccionar...')))
-    st.session_state.contacto_sel = str(row_norm.get('CONTACTO', 'Seleccionar...'))
-    st.session_state.entrega_val = str(row_norm.get('TIEMPO_DE_ENTREGA', row_norm.get('ENTREGA', 'Seleccionar...')))
-    st.session_state.pago_val = str(row_norm.get('FORMA_DE_PAGO', row_norm.get('PAGO', 'Seleccionar...')))
-    st.session_state.condic_val = str(row_norm.get('CONDICIONES', row_norm.get('CONDICIONES_ESPECIALES', 'Seleccionar...')))
-    st.session_state.coment_val = str(row_norm.get('COMENTARIOS', row_norm.get('RESUMEN', '')))
-    st.session_state.moneda_val = str(row_norm.get('MONEDA', 'MXN'))
-    st.session_state.tc_val = float(row_norm.get('TC', row_norm.get('TIPO_DE_CAMBIO', 1.0)))
+    
+    # Ejecutivo: nombre o posición 1
+    ej_val = row_norm.get('EJECUTIVO') or (row_list[1] if len(row_list)>1 else None)
+    st.session_state.ejecutivo_nom = str(ej_val) if ej_val else st.session_state.usuario
+    
+    # Cliente: nombre o posición 6
+    cli_val = row_norm.get('CLIENTE') or row_norm.get('RAZON_SOCIAL') or (row_list[6] if len(row_list)>6 else None)
+    st.session_state.cliente_sel = str(cli_val) if cli_val else 'Seleccionar...'
+    
+    # Contacto: nombre o posición 7
+    cont_val = row_norm.get('CONTACTO') or (row_list[7] if len(row_list)>7 else None)
+    st.session_state.contacto_sel = str(cont_val) if cont_val else 'Seleccionar...'
+    
+    # Entrega: nombre o posición 9
+    ent_val = row_norm.get('TIEMPO_DE_ENTREGA') or row_norm.get('ENTREGA') or (row_list[9] if len(row_list)>9 else None)
+    st.session_state.entrega_val = str(ent_val) if ent_val else 'Seleccionar...'
+    
+    # Pago: nombre o posición 10
+    pag_val = row_norm.get('FORMA_DE_PAGO') or row_norm.get('PAGO') or (row_list[10] if len(row_list)>10 else None)
+    st.session_state.pago_val = str(pag_val) if pag_val else 'Seleccionar...'
+    
+    # Condiciones: nombre o posición 11
+    con_val = row_norm.get('CONDICIONES_ESPECIALES') or row_norm.get('CONDICIONES') or (row_list[11] if len(row_list)>11 else None)
+    st.session_state.condic_val = str(con_val) if con_val else 'Seleccionar...'
+    
+    # Comentarios: nombre o posición 12
+    com_val = row_norm.get('COMENTARIOS') or row_norm.get('RESUMEN') or (row_list[12] if len(row_list)>12 else None)
+    st.session_state.coment_val = str(com_val) if com_val else ""
+    
+    # Moneda y TC: nombre o posiciones 14 y 15
+    mon_val = row_norm.get('MONEDA') or (row_list[14] if len(row_list)>14 else 'MXN')
+    st.session_state.moneda_val = str(mon_val)
+    
+    tc_val = row_norm.get('TC') or row_norm.get('TIPO_DE_CAMBIO') or (row_list[15] if len(row_list)>15 else 1.0)
+    try: st.session_state.tc_val = float(tc_val)
+    except: st.session_state.tc_val = 1.0
 
     try:
-        val_v = str(row_norm.get('VIGENCIA', ''))
+        vig_val = row_norm.get('VIGENCIA') or (row_list[8] if len(row_list)>8 else None)
+        val_v = str(vig_val) if vig_val else ""
         st.session_state.vigencia_val = datetime.strptime(val_v, "%Y-%m-%d").date() if "-" in val_v else date.today()
     except:
         st.session_state.vigencia_val = date.today()
@@ -1987,18 +2015,21 @@ else:
 
                 with col_t1:
                     opciones_entrega = ext_col(st.session_state.terminos_db, "ENTREGA")
-                    idx_e = buscar_index(opciones_entrega, st.session_state.get('entrega_val'))
-                    entrega = st.selectbox("Entrega:", ["Seleccionar..."] + opciones_entrega, index=idx_e, key="entrega_val_sel")
+                    full_entrega = ["Seleccionar..."] + opciones_entrega
+                    idx_e = buscar_index(full_entrega, st.session_state.get('entrega_val'))
+                    entrega = st.selectbox("Entrega:", full_entrega, index=idx_e, key="entrega_val_sel")
                     st.session_state.entrega_val = entrega
                 with col_t2:
                     opciones_pago = ext_col(st.session_state.terminos_db, "PAGO")
-                    idx_p = buscar_index(opciones_pago, st.session_state.get('pago_val'))
-                    pago = st.selectbox("Pago:", ["Seleccionar..."] + opciones_pago, index=idx_p, key="pago_val_sel")
+                    full_pago = ["Seleccionar..."] + opciones_pago
+                    idx_p = buscar_index(full_pago, st.session_state.get('pago_val'))
+                    pago = st.selectbox("Pago:", full_pago, index=idx_p, key="pago_val_sel")
                     st.session_state.pago_val = pago
                 with col_t3:
                     opciones_cond = ext_col(st.session_state.terminos_db, "CONDICIONES")
-                    idx_c = buscar_index(opciones_cond, st.session_state.get('condic_val'))
-                    condic = st.selectbox("Condiciones Especiales:", ["Seleccionar..."] + opciones_cond, index=idx_c, key="condic_val_sel")
+                    full_cond = ["Seleccionar..."] + opciones_cond
+                    idx_c = buscar_index(full_cond, st.session_state.get('condic_val'))
+                    condic = st.selectbox("Condiciones Especiales:", full_cond, index=idx_c, key="condic_val_sel")
                     st.session_state.condic_val = condic
                 
                 # Comentarios eliminados de aquí (se movieron a Finalizar)
