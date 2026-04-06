@@ -1211,6 +1211,10 @@ def cargar_cotizacion_para_editar(row, df_resumen):
     try: st.session_state.tc_val = float(tc_val)
     except: st.session_state.tc_val = 1.0
 
+    # Estatus: nombre o posición 13
+    est_val = row_norm.get('ESTATUS') or (row_list[13] if len(row_list)>13 else '60% Propuesta')
+    st.session_state.estatus_val = str(est_val)
+
     try:
         vig_val = row_norm.get('VIGENCIA') or (row_list[8] if len(row_list)>8 else None)
         val_v = str(vig_val) if vig_val else ""
@@ -1489,7 +1493,7 @@ else:
                     # LIMPIEZA TOTAL DE MEMORIA PARA NUEVA COTIZACIÓN
                     keys_to_reset = [
                         'folio_val', 'folio_original_edicion', 'ultimo_cliente_folio', 'ultimo_ejecutivo_folio',
-                        'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 
+                        'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 'estatus_val',
                         'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso', 
                         'cliente_sel', 'contacto_sel', 'ejecutivo_nom'
                     ]
@@ -2256,9 +2260,18 @@ else:
                 st.write("**Conceptos a registrar:**", ", ".join([str(x) for x in df_analisis["Concepto"].tolist()]))
                 
                 st.divider()
-                val_coment = st.session_state.get('coment_val', "")
-                comentarios = st.text_area("✍️ Comentarios / Resumen Ejecutivo:", value=val_coment, key="coment_val_input", help="Estos comentarios se guardarán en el historial y son útiles para el seguimiento.")
-                st.session_state.coment_val = comentarios
+                col_fin1, col_fin2 = st.columns(2)
+                with col_fin1:
+                    val_coment = st.session_state.get('coment_val', "")
+                    comentarios = st.text_area("✍️ Comentarios / Resumen Ejecutivo:", value=val_coment, key="coment_val_input", help="Estos comentarios se guardarán en el historial y son útiles para el seguimiento.")
+                    st.session_state.coment_val = comentarios
+                
+                with col_fin2:
+                    opciones_estatus = ["1% Planificación", "10% Descubrir", "30% Clasificación", "60% Propuesta", "90% Compromiso", "100% Ganada", "0% Cancelada"]
+                    val_est_actual = st.session_state.get('estatus_val', '60% Propuesta')
+                    idx_est = buscar_index(opciones_estatus, val_est_actual)
+                    estatus_sel = st.selectbox("Estatus del Proyecto (Embudo):", opciones_estatus, index=idx_est, key="estatus_sel_final")
+                    st.session_state.estatus_val = estatus_sel
 
                 if st.button("CONFIRMAR Y GUARDAR TODO", use_container_width=True, type="primary"):
                     if "Seleccionar..." in [ejecutivo_nom, cliente_sel, contacto_sel, entrega, pago, condic] or not st.session_state.folio_val:
@@ -2267,6 +2280,7 @@ else:
                         try:
                             with st.spinner("Guardando en Sheets y Drive..."):
                                 folio_actual = st.session_state.folio_val
+                                estatus_final = st.session_state.get('estatus_val', '60% Propuesta')
                                 
                                 dict_links_drive = st.session_state.get('dict_fotos_links', {}).copy()
                                 if st.session_state.dict_fotos:
@@ -2284,16 +2298,9 @@ else:
 
                                 ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
                                 folios_res = ws_res.col_values(1)
-                                estatus_final = "60% Propuesta"
                                 
                                 if str(folio_actual) in [str(f) for f in folios_res]:
                                     idx_fila = [str(f) for f in folios_res].index(str(folio_actual)) + 1
-                                    try:
-                                        headers = ws_res.row_values(1)
-                                        col_est_idx = headers.index("ESTATUS") + 1
-                                        estatus_actual = ws_res.cell(idx_fila, col_est_idx).value
-                                        if estatus_actual: estatus_final = estatus_actual
-                                    except: pass
                                     ws_res.delete_rows(idx_fila)
 
                                 ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
