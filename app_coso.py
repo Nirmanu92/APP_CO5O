@@ -13,6 +13,14 @@ import os
 import json
 import time
 import tempfile
+from PIL import Image
+
+# --- CONFIGURACIÓN UI (DEBE SER LO PRIMERO) ---
+try:
+    img_favicon = Image.open("ICONO.png")
+    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon=img_favicon, layout="wide", initial_sidebar_state="expanded")
+except:
+    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon="ICONO.png", layout="wide", initial_sidebar_state="expanded")
 
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -209,14 +217,6 @@ def obtener_drive_service():
         # st.write(f"Debug Drive: {e}") # Descomentar para ver errores de conexión
         return None
     return None
-
-# --- CONFIGURACIÓN UI ---
-try:
-    from PIL import Image
-    img_favicon = Image.open("ICONO.png")
-    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon=img_favicon, layout="wide", initial_sidebar_state="expanded")
-except:
-    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon="ICONO.png", layout="wide", initial_sidebar_state="expanded")
 
 # --- GENERADOR DE FOLIO AUTOMÁTICO ---
 def generar_folio_automatico(cliente_rs, ejecutivo_id):
