@@ -264,9 +264,9 @@ def obtener_drive_service():
         return None
     return None
 
-# --- GENERADOR DE FOLIO AUTOMÁTICO ---
+# --- GENERADOR DE FOLIO AUTOMÁTICO (OPTIMIZADO) ---
 def generar_folio_automatico(cliente_rs, ejecutivo_id):
-    """Genera un folio con sintaxis: CLIENTE-EJECUTIVO-FECHA-SUCURSAL-CONSECUTIVO"""
+    """Genera un folio usando los datos ya cargados en sesión para evitar error 429."""
     try:
         # 1. Siglas Cliente
         info_c = next((c for c in st.session_state.directorio if c['RAZON_SOCIAL'] == cliente_rs), {})
@@ -277,25 +277,27 @@ def generar_folio_automatico(cliente_rs, ejecutivo_id):
         siglas_e = str(info_e.get('SIGLAS', 'SEJ')).upper()[:3]
         sucursal = str(info_e.get('SUCURSAL', 'MX')).upper()[:2]
         
-        # 3. Fecha (YYMMDD) usando hora de México
+        # 3. Fecha (YYMMDD)
         fecha_str = ahora_mexico().strftime("%y%m%d")
+        prefijo = f"{siglas_c}-{siglas_e}-{fecha_str}-{sucursal}"
         
-        # 4. Consecutivo (Basado en el historial)
-        prefijo_busqueda = f"{siglas_c}-{siglas_e}-{fecha_str}-{sucursal}"
-        
-        ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
-        folios_historial = ws_res.col_values(1) # Columna FOLIO
-        
-        # Contar cuántos folios existen hoy para este ejecutivo/cliente
+        # 4. Consecutivo (Usar lo que ya tenemos en el historial del Dashboard)
+        # Si no hay historial cargado, hacemos una lectura rápida única
         count = 1
-        for f in folios_historial:
-            if str(f).startswith(prefijo_busqueda):
+        if 'df_resumen_folios' in st.session_state:
+            folios = st.session_state.df_resumen_folios
+        else:
+            ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
+            folios = ws_res.col_values(1)
+            st.session_state.df_resumen_folios = folios
+            
+        for f in folios:
+            if str(f).startswith(prefijo):
                 count += 1
         
-        consecutivo = str(count).zfill(3)
-        return f"{prefijo_busqueda}-{consecutivo}"
-    except Exception:
-        return ""
+        return f"{prefijo}-{str(count).zfill(3)}"
+    except:
+        return f"ERROR-{ahora_mexico().strftime('%y%m%d')}-001"
 
 # --- ESTILO DE ALTA DEFINICIÓN (PRO UI) ---
 st.markdown("""
