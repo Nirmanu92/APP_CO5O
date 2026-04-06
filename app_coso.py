@@ -1875,14 +1875,15 @@ else:
                 col_e1, col_e2, col_e3 = st.columns(3)
                 
                 def buscar_index(lista, valor):
-                    if not valor or valor not in lista: return 0
-                    try: return lista.index(valor)
+                    if not valor or valor == "Seleccionar..." or valor not in lista: return 0
+                    try: return lista.index(valor) + 1 # +1 por el prefijo "Seleccionar..."
                     except: return 0
 
                 with col_e1:
                     ejecutivos_lista = [u['NOMBRE'] for u in st.session_state.usuarios_db]
-                    idx_ej = buscar_index(ejecutivos_lista, st.session_state.get('ejecutivo_nom'))
-                    ejecutivo_nom = st.selectbox("Ejecutivo que firma:", ["Seleccionar..."] + ejecutivos_lista, index=idx_ej, key="ejecutivo_sel")
+                    val_ej_actual = st.session_state.get('ejecutivo_nom', 'Seleccionar...')
+                    idx_ej = buscar_index(ejecutivos_lista, val_ej_actual)
+                    ejecutivo_nom = st.selectbox("Ejecutivo que firma:", ["Seleccionar..."] + ejecutivos_lista, index=idx_ej, key="ejecutivo_sel_widget")
                     st.session_state.ejecutivo_nom = ejecutivo_nom
                 
                 v_tel, v_mail = ("", "")
