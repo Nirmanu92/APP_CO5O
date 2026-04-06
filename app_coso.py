@@ -1109,11 +1109,10 @@ def cargar_cotizacion_para_editar(row, df_resumen):
 
 # --- 3. BUSCADOR DE VÍNCULOS Y OPERACIONES (OVO) ---
 def buscar_en_todos_los_sheets(query):
-    """Busca coincidencias con diagnóstico de errores de acceso."""
+    """Busca coincidencias con diagnóstico profundo paso a paso."""
     resultados = []
     gc = conectar_google_sheets()
-    hojas_escaneadas = 0
-    errores_acceso = []
+    resumen_escaneo = []
     
     with st.spinner("Escaneando ecosistema de proyectos..."):
         for u in st.session_state.usuarios_db:
@@ -1123,32 +1122,51 @@ def buscar_en_todos_los_sheets(query):
             
             try:
                 sh_target = gc.open_by_key(sheet_id)
-                ws_dir = sh_target.worksheet("DIRECTORIO")
-                datos_dir = ws_dir.get_all_records()
-                hojas_escaneadas += 1
+                # Intentar varios nombres de pestañas comunes
+                ws_dir = None
+                for name in ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES"]:
+                    try:
+                        ws_dir = sh_target.worksheet(name)
+                        break
+                    except: continue
                 
-                for d in datos_dir:
-                    # Normalizar llaves para ignorar espacios y guiones
-                    d_norm = {str(k).upper().replace(" ", "_"): v for k, v in d.items()}
+                if ws_dir:
+                    datos_dir = ws_dir.get_all_records()
+                    count_registros = len(datos_dir)
+                    resumen_escaneo.append(f"✅ {nombre_ej}: {count_registros} reg.")
                     
-                    razon = str(d_norm.get('RAZON_SOCIAL', d_norm.get('RAZON_SOCIAL_DEL_CLIENTE', ''))).upper()
-                    contacto = str(d_norm.get('CONTACTO', d_norm.get('ATENCION', ''))).upper()
-                    
-                    if query.upper() in razon or query.upper() in contacto:
-                        d['EJECUTIVO_DUEÑO'] = nombre_ej
-                        try:
-                            ws_res = sh_target.worksheet("COTIZACIONES_RESUMEN")
-                            resumenes = ws_res.get_all_records()
-                            d['ULTIMA_ACTIVIDAD'] = resumenes[-1].get('FECHA_ELABORACION', 'N/A') if resumenes else "Sin cotizaciones"
-                        except:
-                            d['ULTIMA_ACTIVIDAD'] = "N/A"
-                        resultados.append(d)
+                    for d in datos_dir:
+                        # BÚSQUEDA TOTAL: Unir todos los valores de la fila en un solo texto
+                        toda_la_fila = " ".join([str(v) for v in d.values()]).upper()
+                        
+                        if query.upper() in toda_la_fila:
+                            # Intentar normalizar nombres para la vista
+                            d_norm = {str(k).upper().replace(" ", "_"): v for k, v in d.items()}
+                            res_final = {
+                                'RAZON_SOCIAL': d_norm.get('RAZON_SOCIAL', d_norm.get('CLIENTE', 'N/A')),
+                                'CONTACTO': d_norm.get('CONTACTO', d_norm.get('ATENCION', 'N/A')),
+                                'EMAIL': d_norm.get('EMAIL', 'N/A'),
+                                'TELEFONO': d_norm.get('TELEFONO', 'N/A'),
+                                'EJECUTIVO_DUEÑO': nombre_ej
+                            }
+                            # Intentar obtener última actividad
+                            try:
+                                ws_res = sh_target.worksheet("COTIZACIONES_RESUMEN")
+                                resumenes = ws_res.get_all_records()
+                                res_final['ULTIMA_ACTIVIDAD'] = resumenes[-1].get('FECHA_ELABORACION', 'N/A') if resumenes else "Sin cotizaciones"
+                            except:
+                                res_final['ULTIMA_ACTIVIDAD'] = "N/A"
+                            
+                            resultados.append(res_final)
+                else:
+                    resumen_escaneo.append(f"❓ {nombre_ej}: Sin pestaña Directorio")
             except Exception:
-                errores_acceso.append(nombre_ej)
+                resumen_escaneo.append(f"❌ {nombre_ej}: Sin acceso")
                 continue 
     
-    if errores_acceso:
-        st.caption(f"ℹ️ Escaneo completado: {hojas_escaneadas} hojas revisadas. No se pudo acceder a las hojas de: {', '.join(errores_acceso)}.")
+    # Mostrar el mapa de lo que la App realmente está viendo
+    with st.expander("Detalle del escaneo (Diagnóstico)"):
+        st.write(" | ".join(resumen_escaneo))
     
     return resultados
 
