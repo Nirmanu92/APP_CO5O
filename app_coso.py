@@ -1390,6 +1390,87 @@ def renderizar_buscador_ovo():
                         st.divider()
                         st.json(res)
 
+def renderizar_dashboard_operaciones():
+    st.title("📊 Dashboard de Sales Operation Support")
+    st.markdown("### Análisis de Leads y Contactos del Ecosistema")
+    
+    # 1. Análisis Global de Contactos por Ejecutivo
+    resumen_ejecutivos = []
+    total_leads_salvador = 0
+    leads_asignados = 0
+    
+    with st.spinner("Analizando bases de datos..."):
+        for u in st.session_state.usuarios_db:
+            nombre_ej = u.get('NOMBRE', 'Ejecutivo')
+            usuario_id = u['USUARIO']
+            sheet_id = str(u.get('ID_SHEET') or u.get('SPREADSHEET_ID') or "").strip()
+            
+            # Cargar directorio del ejecutivo
+            datos_dir = obtener_directorio_ejecutivo_cached(sheet_id, usuario_id)
+            if datos_dir:
+                df_dir = pd.DataFrame(datos_dir)
+                df_dir.columns = [str(c).upper().replace(" ", "_") for c in df_dir.columns]
+                
+                num_contactos = len(df_dir)
+                
+                # Calcular días promedio de contacto si existe la columna
+                dias_promedio = 0
+                if 'FECHA_ULTIMO_CONTACTO' in df_dir.columns or 'ULTIMA_FECHA' in df_dir.columns:
+                    col_f = 'FECHA_ULTIMO_CONTACTO' if 'FECHA_ULTIMO_CONTACTO' in df_dir.columns else 'ULTIMA_FECHA'
+                    def diff_dias(x):
+                        try:
+                            f = pd.to_datetime(x).date()
+                            return (date.today() - f).days
+                        except: return None
+                    dias = df_dir[col_f].apply(diff_dias).dropna()
+                    dias_promedio = dias.mean() if not dias.empty else 0
+
+                resumen_ejecutivos.append({
+                    "Ejecutivo": nombre_ej,
+                    "Contactos": num_contactos,
+                    "Días Prom. Seguimiento": round(dias_promedio, 1)
+                })
+
+                # Si es la base de Salvador, contar leads y asignaciones
+                if usuario_id == "SALVADOR_LAMEGOS":
+                    total_leads_salvador = num_contactos
+                    if 'EJECUTIVO_ASIGNADO' in df_dir.columns:
+                        leads_asignados = df_dir[df_dir['EJECUTIVO_ASIGNADO'].notstr.strip() != ""].shape[0]
+                    elif 'ASIGNADO' in df_dir.columns:
+                        leads_asignados = df_dir[df_dir['ASIGNADO'].astype(str).str.len() > 2].shape[0]
+
+    # 2. Visualización de KPIs
+    k1, k2, k3, k4 = st.columns(4)
+    with k1: st.metric("Leads Generados (Salvador)", total_leads_salvador)
+    with k2: st.metric("Leads Asignados", leads_asignados)
+    with k3: 
+        porcentaje = (leads_asignados/total_leads_salvador*100) if total_leads_salvador > 0 else 0
+        st.metric("% de Asignación", f"{porcentaje:.1f}%")
+    with k4:
+        total_contactos_global = sum([r['Contactos'] for r in resumen_ejecutivos])
+        st.metric("Contactos Globales", total_contactos_global)
+
+    st.divider()
+    
+    c_op1, c_op2 = st.columns([2, 1])
+    
+    with c_op1:
+        st.subheader("Concentración de Contactos por Ejecutivo")
+        df_resumen = pd.DataFrame(resumen_ejecutivos)
+        if not df_resumen.empty:
+            fig_op = px.bar(df_resumen, x='Ejecutivo', y='Contactos', color='Días Prom. Seguimiento',
+                           title="Volumen vs Tiempos de Respuesta",
+                           color_continuous_scale=px.colors.sequential.Reds)
+            st.plotly_chart(fig_op, use_container_width=True)
+    
+    with c_op2:
+        st.subheader("Ranking de Seguimiento")
+        if not df_resumen.empty:
+            st.dataframe(df_resumen.sort_values('Días Prom. Seguimiento', ascending=False), hide_index=True)
+
+    st.divider()
+    st.info("💡 Salvador: Puedes usar el 'Buscador de Vínculos' en el menú superior para analizar si un nuevo lead ya está en la base de algún ejecutivo.")
+
 # --- ACTIVACIÓN DE RECEPCIÓN DE DRIVE (OAUTH) ---
 # Esta función debe correr antes de que Streamlit detenga el flujo por el Login
 procesar_callback_oauth()
@@ -1504,49 +1585,60 @@ else:
             renderizar_buscador_ovo()
 
         elif st.session_state.menu_actual == 'menu':
-            st.title(f"Panel de Control - {st.session_state.usuario}")
-            # 1. BOTONES DE ACCIÓN
-            col_acc1, col_acc2, _ = st.columns([1, 1, 1])
-            with col_acc1:
-                if st.button("Crear Cotización Nueva", use_container_width=True, type="primary"):
-                    # LIMPIEZA TOTAL DE MEMORIA PARA NUEVA COTIZACIÓN
-                    keys_to_reset = [
-                        'folio_val', 'folio_original_edicion', 'ultimo_cliente_folio', 'ultimo_ejecutivo_folio',
-                        'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 'estatus_val',
-                        'ultimo_contacto_val', 'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso', 
-                        'cliente_sel', 'contacto_sel', 'ejecutivo_nom'
-                    ]
-                    for k in keys_to_reset:
-                        if k in st.session_state: del st.session_state[k]
-                    st.session_state.menu_actual = 'nuevo'
-                    st.rerun()
-            
-            with col_acc2:
-                if st.button("Buscador de Vínculos y Operaciones", use_container_width=True):
-                    st.session_state.menu_actual = 'ovo'
-                    st.rerun()
-            
-            st.divider()
+            if st.session_state.rol == "OPERACIONES":
+                # --- VISTA PARA SALES OPERATION SUPPORT (SALVADOR) ---
+                col_acc1, col_acc2, _ = st.columns([1, 1, 1])
+                with col_acc1:
+                    if st.button("🔎 BUSCADOR DE VÍNCULOS", use_container_width=True, type="primary"):
+                        st.session_state.menu_actual = 'ovo'
+                        st.rerun()
+                st.divider()
+                renderizar_dashboard_operaciones()
+            else:
+                # --- VISTA ESTÁNDAR PARA EJECUTIVOS Y DIRECCIÓN ---
+                st.title(f"Panel de Control - {st.session_state.usuario}")
+                # 1. BOTONES DE ACCIÓN
+                col_acc1, col_acc2, _ = st.columns([1, 1, 1])
+                with col_acc1:
+                    if st.button("Crear Cotización Nueva", use_container_width=True, type="primary"):
+                        # LIMPIEZA TOTAL DE MEMORIA PARA NUEVA COTIZACIÓN
+                        keys_to_reset = [
+                            'folio_val', 'folio_original_edicion', 'ultimo_cliente_folio', 'ultimo_ejecutivo_folio',
+                            'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 'estatus_val',
+                            'ultimo_contacto_val', 'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso', 
+                            'cliente_sel', 'contacto_sel', 'ejecutivo_nom'
+                        ]
+                        for k in keys_to_reset:
+                            if k in st.session_state: del st.session_state[k]
+                        st.session_state.menu_actual = 'nuevo'
+                        st.rerun()
+                
+                with col_acc2:
+                    if st.button("Buscador de Vínculos y Operaciones", use_container_width=True):
+                        st.session_state.menu_actual = 'ovo'
+                        st.rerun()
+                
+                st.divider()
 
-            # 2. CÁLCULO DE MÉTRICAS (KPIs) e HISTORIAL
-            try:
-                ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
-                df_resumen = pd.DataFrame(ws_res.get_all_records())
-                
-                ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
-                df_det_all = pd.DataFrame(ws_det.get_all_records())
-                
-                if not df_resumen.empty:
-                    col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
-                    col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
+                # 2. CÁLCULO DE MÉTRICAS (KPIs) e HISTORIAL
+                try:
+                    ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
+                    df_resumen = pd.DataFrame(ws_res.get_all_records())
                     
-                    # Normalizar nombres de columnas del detalle para el cálculo
-                    df_det_norm = df_det_all.copy()
-                    df_det_norm.columns = [c.upper().replace(" ", "_") for c in df_det_norm.columns]
-                    col_folio_det = df_det_norm.columns[0]
+                    ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
+                    df_det_all = pd.DataFrame(ws_det.get_all_records())
                     
-                    # Identificar columnas de monto y utilidad de forma robusta
-                    col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL_CON_IVA" in c or "PFACTURA_TOTAL_IVA_INC" in c), df_det_norm.columns[-3])
+                    if not df_resumen.empty:
+                        col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
+                        col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
+                        
+                        # Normalizar nombres de columnas del detalle para el cálculo
+                        df_det_norm = df_det_all.copy()
+                        df_det_norm.columns = [c.upper().replace(" ", "_") for c in df_det_norm.columns]
+                        col_folio_det = df_det_norm.columns[0]
+                        
+                        # Identificar columnas de monto y utilidad de forma robusta
+                        col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL_CON_IVA" in c or "PFACTURA_TOTAL_IVA_INC" in c), df_det_norm.columns[-3])
                     col_util_src = next((c for c in df_det_norm.columns if "UTILIDAD_TOTAL" in c), df_det_norm.columns[-1])
 
                     df_montos_util = df_det_norm.groupby(col_folio_det).agg({
