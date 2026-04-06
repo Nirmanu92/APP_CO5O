@@ -1143,6 +1143,8 @@ if not st.session_state.autenticado:
                     if datos_user and str(datos_user['PASSWORD']) == pass_input:
                         st.session_state.autenticado = True
                         st.session_state.usuario = user_input
+                        # CARGAR EL ROL (Default: EJECUTIVO)
+                        st.session_state.rol = str(datos_user.get('ROL', 'EJECUTIVO')).upper()
                         st.rerun()
                     else:
                         st.error("Credenciales incorrectas")
