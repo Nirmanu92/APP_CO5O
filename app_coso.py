@@ -1107,6 +1107,83 @@ def cargar_cotizacion_para_editar(row, df_resumen):
     except:
         pass
 
+# --- 3. BUSCADOR DE VÍNCULOS Y OPERACIONES (OVO) ---
+def buscar_en_todos_los_sheets(query):
+    """Busca coincidencias en los directorios de todos los ejecutivos registrados."""
+    resultados = []
+    gc = conectar_google_sheets()
+    
+    with st.spinner("Escaneando ecosistema de proyectos..."):
+        for u in st.session_state.usuarios_db:
+            sheet_id = u.get('ID_SHEET') or u.get('SPREADSHEET_ID')
+            if not sheet_id: continue
+            
+            try:
+                sh_target = gc.open_by_key(sheet_id)
+                ws_dir = sh_target.worksheet("DIRECTORIO")
+                datos_dir = ws_dir.get_all_records()
+                
+                for d in datos_dir:
+                    search_str = f"{d.get('RAZON_SOCIAL', '')} {d.get('CONTACTO', '')}".upper()
+                    if query.upper() in search_str:
+                        d['EJECUTIVO_DUEÑO'] = u['NOMBRE']
+                        try:
+                            ws_res = sh_target.worksheet("COTIZACIONES_RESUMEN")
+                            resumenes = ws_res.get_all_records()
+                            cliente_col = 'CLIENTE' if 'CLIENTE' in resumenes[0] else 'RAZON_SOCIAL'
+                            fechas = [r.get('FECHA_ELABORACION', '') for r in resumenes if str(r.get(cliente_col)) == str(d.get('RAZON_SOCIAL'))]
+                            d['ULTIMA_ACTIVIDAD'] = max(fechas) if fechas else "Sin cotizaciones"
+                        except:
+                            d['ULTIMA_ACTIVIDAD'] = "N/A"
+                        resultados.append(d)
+            except:
+                continue 
+    return resultados
+
+def renderizar_buscador_ovo():
+    st.title("🔎 Buscador de Vínculos y Operaciones")
+    st.info("Escribe el nombre de la empresa o contacto para verificar disponibilidad.")
+    
+    col_s1, col_s2 = st.columns([3, 1])
+    with col_s1:
+        query = st.text_input("Empresa o Contacto a buscar:", placeholder="Ej. FEMSA, Juan Pérez...")
+    with col_s2:
+        st.write("")
+        st.write("")
+        btn_buscar = st.button("BUSCAR AHORA", use_container_width=True, type="primary")
+
+    if btn_buscar and query:
+        encontrados = buscar_en_todos_los_sheets(query)
+        if not encontrados:
+            st.success(f"✅ No se encontraron vínculos para '{query}'. El prospecto parece estar LIBRE.")
+        else:
+            st.warning(f"⚠️ Se encontraron {len(encontrados)} coincidencias en el ecosistema.")
+            rol = st.session_state.rol
+            for res in encontrados:
+                with st.expander(f"Resultado: {res.get('RAZON_SOCIAL', 'N/A')}"):
+                    if rol == "EJECUTIVO":
+                        st.error("❌ ESTE CLIENTE YA ESTÁ SIENDO ATENDIDO.")
+                        st.markdown("**Para más información, contactar con el administrador o Dirección.**")
+                    elif rol == "OPERACIONES":
+                        st.subheader("Información de Vínculo")
+                        c1, c2 = st.columns(2)
+                        c1.write(f"**Atendido por:** {res.get('EJECUTIVO_DUEÑO')}")
+                        c2.write(f"**Última Actividad:** {res.get('ULTIMA_ACTIVIDAD')}")
+                    elif rol == "DIRECCION":
+                        st.subheader("Expediente Completo (Visión Dirección)")
+                        c1, c2, c3 = st.columns(3)
+                        with c1:
+                            st.write(f"**Empresa:** {res.get('RAZON_SOCIAL')}")
+                            st.write(f"**Ejecutivo:** {res.get('EJECUTIVO_DUEÑO')}")
+                        with c2:
+                            st.write(f"**Contacto:** {res.get('CONTACTO')}")
+                            st.write(f"**Email:** {res.get('EMAIL')}")
+                        with c3:
+                            st.write(f"**Teléfono:** {res.get('TELEFONO')}")
+                            st.write(f"**Última Fecha:** {res.get('ULTIMA_ACTIVIDAD')}")
+                        st.divider()
+                        st.json(res)
+
 # --- ACTIVACIÓN DE RECEPCIÓN DE DRIVE (OAUTH) ---
 # Esta función debe correr antes de que Streamlit detenga el flujo por el Login
 procesar_callback_oauth()
