@@ -1226,6 +1226,14 @@ def cargar_cotizacion_para_editar(row, df_resumen):
     est_val = row_norm.get('ESTATUS') or (row_list[13] if len(row_list)>13 else '60% Propuesta')
     st.session_state.estatus_val = str(est_val)
 
+    # Último Contacto: nombre o posición 16 (Columna Q)
+    cont_date_val = row_norm.get('ULTIMO_CONTACTO') or (row_list[16] if len(row_list)>16 else None)
+    try:
+        val_cd = str(cont_date_val) if cont_date_val else ""
+        st.session_state.ultimo_contacto_val = datetime.strptime(val_cd, "%Y-%m-%d").date() if "-" in val_cd else date.today()
+    except:
+        st.session_state.ultimo_contacto_val = date.today()
+
     try:
         vig_val = row_norm.get('VIGENCIA') or (row_list[8] if len(row_list)>8 else None)
         val_v = str(vig_val) if vig_val else ""
@@ -1505,7 +1513,7 @@ else:
                     keys_to_reset = [
                         'folio_val', 'folio_original_edicion', 'ultimo_cliente_folio', 'ultimo_ejecutivo_folio',
                         'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 'estatus_val',
-                        'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso', 
+                        'ultimo_contacto_val', 'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso', 
                         'cliente_sel', 'contacto_sel', 'ejecutivo_nom'
                     ]
                     for k in keys_to_reset:
@@ -1558,6 +1566,15 @@ else:
                     util_activa = df_activos_stats['UTILIDAD_TOTAL'].sum()
                     monto_ganado = df_stats[df_stats['ESTATUS'].isin(["100% Ganada", "100% Pedido"])]['MONTO_TOTAL'].sum()
                     
+                    # --- NUEVO: CÁLCULO DE DÍAS SIN CONTACTO ---
+                    def calcular_dias(fecha_str):
+                        try:
+                            f = datetime.strptime(str(fecha_str), "%Y-%m-%d").date()
+                            return (date.today() - f).days
+                        except: return 0
+
+                    df_activos_stats['DIAS_SIN_CONTACTO'] = df_activos_stats['ULTIMO_CONTACTO'].apply(calcular_dias) if 'ULTIMO_CONTACTO' in df_activos_stats.columns else 0
+                    
                     # --- BLOQUE DE INTELIGENCIA VISUAL (NUEVO) ---
                     st.markdown("### 🚀 Vista Rápida")
                     
@@ -1578,6 +1595,25 @@ else:
                     
                     st.write("")
                     
+                    # --- NUEVO: ALERTA DE SEGUIMIENTO ---
+                    if 'DIAS_SIN_CONTACTO' in df_activos_stats.columns and not df_activos_stats.empty:
+                        st.markdown("### ⚠️ Alerta de Seguimiento (Sin contacto)")
+                        df_alertas = df_activos_stats.sort_values('DIAS_SIN_CONTACTO', ascending=False).head(3)
+                        c_al = st.columns(3)
+                        for idx_al, (_, row_al) in enumerate(df_alertas.iterrows()):
+                            with c_al[idx_al]:
+                                dias = row_al['DIAS_SIN_CONTACTO']
+                                color_al = "#E74C3C" if dias > 15 else ("#F39C12" if dias > 7 else "#2ECC71")
+                                st.markdown(f"""
+                                <div style='background: rgba(231, 76, 60, 0.05); border: 1px solid {color_al}; border-radius: 10px; padding: 10px;'>
+                                    <p style='margin:0; font-size: 11px; color: #94A3B8;'>{row_al[col_folio]}</p>
+                                    <p style='margin:0; font-size: 14px; font-weight: bold;'>{row_al[col_cliente][:18]}</p>
+                                    <p style='margin:0; font-size: 13px; color: {color_al}; font-weight: bold;'>Hace {dias} días</p>
+                                    <p style='margin:0; font-size: 11px;'>Último: {row_al.get('ULTIMO_CONTACTO', 'N/A')}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        st.write("")
+
                     # 2. Gráfico de Pipeline (Tubería)
                     col_g1, col_g2 = st.columns([2, 1])
                     with col_g1:
@@ -1713,10 +1749,18 @@ else:
                             label = f"Folio: {f_id} | {row[col_cliente]} | ${monto_total:,.2f} | {estatus}"
                             with st.expander(label):
                                 c1, c2, c3 = st.columns(3)
-                                c1.write(f"**Fecha:** {row.get('FECHA_ELABORACION', 'N/A')}")
+                                c1.write(f"**Fecha Emisión:** {row.get('FECHA_ELABORACION', 'N/A')}")
                                 c1.write(f"**Estatus:** {estatus}")
+                                
+                                # --- INFO DE CONTACTO ---
+                                u_cont = row.get('ULTIMO_CONTACTO', 'N/A')
+                                dias_oc = calcular_dias(u_cont) if u_cont != 'N/A' else 0
+                                color_txt = "#E74C3C" if dias_oc > 15 else ("#F39C12" if dias_oc > 7 else "#2ECC71")
+                                c2.markdown(f"**Último contacto:** {u_cont}")
+                                c2.markdown(f"**Días sin contacto:** <span style='color:{color_txt}; font-weight:bold;'>{dias_oc} días</span>", unsafe_allow_html=True)
+                                
                                 c2.write(f"**Atención:** {row.get('CONTACTO', 'N/A')}")
-                                c2.write(f"**Monto Total:** ${monto_total:,.2f}")
+                                c3.write(f"**Monto Total:** ${monto_total:,.2f}")
                                 c3.write(f"**Productos:** {conceptos}")
                                 c3.write(f"**Proveedores:** {proveedores}")
                                 
@@ -2283,6 +2327,11 @@ else:
                     idx_est = buscar_index(opciones_estatus, val_est_actual)
                     estatus_sel = st.selectbox("Estatus del Proyecto (Embudo):", opciones_estatus, index=idx_est, key="estatus_sel_final")
                     st.session_state.estatus_val = estatus_sel
+                    
+                    # --- NUEVO: ÚLTIMO CONTACTO ---
+                    val_cont_prev = st.session_state.get('ultimo_contacto_val', date.today())
+                    fecha_contacto = st.date_input("📅 Fecha de último contacto:", value=val_cont_prev, key="u_cont_input")
+                    st.session_state.ultimo_contacto_val = fecha_contacto
 
                 if st.button("CONFIRMAR Y GUARDAR TODO", use_container_width=True, type="primary"):
                     if "Seleccionar..." in [ejecutivo_nom, cliente_sel, contacto_sel, entrega, pago, condic] or not st.session_state.folio_val:
@@ -2292,6 +2341,7 @@ else:
                             with st.spinner("Guardando en Sheets y Drive..."):
                                 folio_actual = st.session_state.folio_val
                                 estatus_final = st.session_state.get('estatus_val', '60% Propuesta')
+                                fecha_cont_str = str(st.session_state.get('ultimo_contacto_val', date.today()))
                                 
                                 dict_links_drive = st.session_state.get('dict_fotos_links', {}).copy()
                                 if st.session_state.dict_fotos:
@@ -2332,13 +2382,14 @@ else:
                                 nombre_pdf = f"{folio_actual}.pdf"
                                 link_pdf_drive = subir_archivo_a_drive(pdf_blob, nombre_pdf, 'application/pdf')
                                 
-                                # Registro en Resumen (Persistencia de Moneda y TC en O y P)
+                                # Registro en Resumen (Persistencia de Moneda y TC en O y P, Último Contacto en Q)
                                 datos_res = [
                                     folio_actual, ejecutivo_nom, mail_e, tel_e, str(date.today()), 
                                     link_pdf_drive, cliente_sel, contacto_sel, str(vigencia), 
                                     entrega, pago, condic, comentarios, estatus_final,
                                     st.session_state.get('moneda_val', 'MXN'),
-                                    st.session_state.get('tc_val', 1.0)
+                                    st.session_state.get('tc_val', 1.0),
+                                    fecha_cont_str
                                 ]
                                 ws_res.update(f"A{obtener_primera_fila_vacia(ws_res)}", [datos_res])
 
