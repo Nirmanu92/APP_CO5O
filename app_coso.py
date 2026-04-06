@@ -1169,93 +1169,7 @@ else:
         if 'menu_actual' not in st.session_state:
             st.session_state.menu_actual = 'menu'
 
-        # --- 3. BUSCADOR DE VÍNCULOS Y OPERACIONES (OVO) ---
-def buscar_en_todos_los_sheets(query):
-    """Busca coincidencias en los directorios de todos los ejecutivos registrados."""
-    resultados = []
-    gc = conectar_google_sheets()
-    
-    with st.spinner("Escaneando ecosistema de proyectos..."):
-        for u in st.session_state.usuarios_db:
-            sheet_id = u.get('ID_SHEET') or u.get('SPREADSHEET_ID')
-            if not sheet_id: continue
-            
-            try:
-                sh_target = gc.open_by_key(sheet_id)
-                ws_dir = sh_target.worksheet("DIRECTORIO")
-                datos_dir = ws_dir.get_all_records()
-                
-                for d in datos_dir:
-                    # Buscar en Razón Social o Contacto
-                    search_str = f"{d.get('RAZON_SOCIAL', '')} {d.get('CONTACTO', '')}".upper()
-                    if query.upper() in search_str:
-                        d['EJECUTIVO_DUEÑO'] = u['NOMBRE']
-                        # Intentar obtener última fecha de cotización de ese ejecutivo para ese cliente
-                        try:
-                            ws_res = sh_target.worksheet("COTIZACIONES_RESUMEN")
-                            resumenes = ws_res.get_all_records()
-                            cliente_col = 'CLIENTE' if 'CLIENTE' in resumenes[0] else 'RAZON_SOCIAL'
-                            fechas = [r.get('FECHA_ELABORACION', '') for r in resumenes if str(r.get(cliente_col)) == str(d.get('RAZON_SOCIAL'))]
-                            d['ULTIMA_ACTIVIDAD'] = max(fechas) if fechas else "Sin cotizaciones"
-                        except:
-                            d['ULTIMA_ACTIVIDAD'] = "N/A"
-                        resultados.append(d)
-            except:
-                continue # Saltar si no hay acceso o no existe la pestaña
-    return resultados
-
-# --- VISTA: BUSCADOR OVO ---
-def renderizar_buscador_ovo():
-    st.title("🔎 Buscador de Vínculos y Operaciones")
-    st.info("Escribe el nombre de la empresa o contacto para verificar disponibilidad.")
-    
-    col_s1, col_s2 = st.columns([3, 1])
-    with col_s1:
-        query = st.text_input("Empresa o Contacto a buscar:", placeholder="Ej. FEMSA, Juan Pérez...")
-    with col_s2:
-        st.write("")
-        st.write("")
-        btn_buscar = st.button("BUSCAR AHORA", use_container_width=True, type="primary")
-
-    if btn_buscar and query:
-        encontrados = buscar_en_todos_los_sheets(query)
-        
-        if not encontrados:
-            st.success(f"✅ No se encontraron vínculos para '{query}'. El prospecto parece estar LIBRE.")
-        else:
-            st.warning(f"⚠️ Se encontraron {len(encontrados)} coincidencias en el ecosistema.")
-            
-            rol = st.session_state.rol
-            
-            for res in encontrados:
-                with st.expander(f"Resultado: {res.get('RAZON_SOCIAL', 'N/A')}"):
-                    if rol == "EJECUTIVO":
-                        st.error("❌ ESTE CLIENTE YA ESTÁ SIENDO ATENDIDO.")
-                        st.markdown("**Para más información, contactar con el administrador o Dirección.**")
-                    
-                    elif rol == "OPERACIONES":
-                        st.subheader("Información de Vínculo")
-                        c1, c2 = st.columns(2)
-                        c1.write(f"**Atendido por:** {res.get('EJECUTIVO_DUEÑO')}")
-                        c2.write(f"**Última Actividad:** {res.get('ULTIMA_ACTIVIDAD')}")
-                        st.caption("Nota: Solo Dirección puede ver el detalle del contacto.")
-                    
-                    elif rol == "DIRECCION":
-                        st.subheader("Expediente Completo (Visión Dirección)")
-                        c1, c2, c3 = st.columns(3)
-                        with c1:
-                            st.write(f"**Empresa:** {res.get('RAZON_SOCIAL')}")
-                            st.write(f"**Ejecutivo:** {res.get('EJECUTIVO_DUEÑO')}")
-                        with c2:
-                            st.write(f"**Contacto:** {res.get('CONTACTO')}")
-                            st.write(f"**Email:** {res.get('EMAIL')}")
-                        with c3:
-                            st.write(f"**Teléfono:** {res.get('TELEFONO')}")
-                            st.write(f"**Última Fecha:** {res.get('ULTIMA_ACTIVIDAD')}")
-                        st.divider()
-                        st.json(res) # Detalle técnico completo para Dirección
-
-# --- BARRA DE NAVEGACIÓN SUPERIOR ---
+        # --- BARRA DE NAVEGACIÓN SUPERIOR ---
         with st.container():
             col_nav1, col_nav2, col_nav3, col_nav4 = st.columns([1, 2, 1, 1])
             with col_nav1:
@@ -1265,15 +1179,15 @@ def renderizar_buscador_ovo():
                         st.rerun()
                 else:
                     st.write("")
-            
+
             with col_nav2:
                 nombre_ej = next((u['NOMBRE'] for u in st.session_state.usuarios_db if u['USUARIO'] == st.session_state.usuario), st.session_state.usuario)
                 st.markdown(f"<p style='text-align: center; font-size: 16px; margin-top: 5px; color: #3498DB;'><b>EJECUTIVO: {nombre_ej.upper()}</b></p>", unsafe_allow_html=True)
-            
+
             with col_nav3:
                 hora_actual = datetime.now().strftime("%H:%M")
                 st.markdown(f"<p style='text-align: center; font-size: 16px; margin-top: 5px;'>{hora_actual} HRS</p>", unsafe_allow_html=True)
-            
+
             with col_nav4:
                 if st.button("CERRAR SESION", use_container_width=True):
                     for key in list(st.session_state.keys()):
@@ -1286,10 +1200,12 @@ def renderizar_buscador_ovo():
             autenticar_usuario_oauth()
             st.divider()
 
-        # --- VISTA: DASHBOARD PRINCIPAL (HOME) ---
-        if st.session_state.menu_actual == 'menu':
+        # --- NAVEGACIÓN DE VISTAS ---
+        if st.session_state.menu_actual == 'ovo':
+            renderizar_buscador_ovo()
+
+        elif st.session_state.menu_actual == 'menu':
             st.title(f"Panel de Control - {st.session_state.usuario}")
-            
             # 1. BOTONES DE ACCIÓN
             col_acc1, col_acc2, _ = st.columns([1, 1, 1])
             with col_acc1:
