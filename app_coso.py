@@ -1122,58 +1122,70 @@ def buscar_en_todos_los_sheets(query):
     
     with st.spinner("Escaneando ecosistema de proyectos..."):
         for u in st.session_state.usuarios_db:
-            nombre_ej = u['NOMBRE']
-            # Normalizar ID de la hoja
+            nombre_ej = u.get('NOMBRE', 'Ejecutivo')
             sheet_id = str(u.get('ID_SHEET') or u.get('SPREADSHEET_ID') or "").strip()
             
-            sh_target = None
             try:
-                if sheet_id:
-                    sh_target = gc.open_by_key(sheet_id)
-                else:
-                    # Intento por nombre si no hay ID
-                    sh_target = gc.open(f"COTIZACIONES_{u['USUARIO']}")
-            except:
-                try: sh_target = gc.open(u['USUARIO']) # Segundo intento
-                except: pass
-            
-            if sh_target:
-                # Intentar varios nombres de pestañas comunes
+                # 1. Apertura del Sheet
+                sh_target = None
+                try:
+                    if sheet_id:
+                        sh_target = gc.open_by_key(sheet_id)
+                    else:
+                        sh_target = gc.open(f"COTIZACIONES_{u['USUARIO']}")
+                except:
+                    try:
+                        sh_target = gc.open(u['USUARIO'])
+                    except:
+                        pass
+                
+                if not sh_target:
+                    resumen_escaneo.append(f"❌ {nombre_ej}: Sin acceso")
+                    continue
+
+                # 2. Localización de la pestaña
                 ws_dir = None
                 for name in ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "HOJA1", "SHEET1"]:
                     try:
                         ws_dir = sh_target.worksheet(name)
                         break
-                    except: continue
+                    except:
+                        continue
                 
-                if ws_dir:
-                    datos_dir = ws_dir.get_all_records()
-                    resumen_escaneo.append(f"✅ {nombre_ej}: {len(datos_dir)} reg.")
-                    
-                    for d in datos_dir:
-                        # BÚSQUEDA PROFUNDA
-                        toda_la_fila = " ".join([str(v) for v in d.values()])
-                        if q_norm in normalizar(toda_la_fila):
-                            # ... (resto de la lógica de guardado de resultados se mantiene igual)
-                            d_norm = {str(k).upper().replace(" ", "_"): v for k, v in d.items()}
-                            res_final = {
-                                'RAZON_SOCIAL': d_norm.get('RAZON_SOCIAL', d_norm.get('CLIENTE', 'N/A')),
-                                'CONTACTO': d_norm.get('CONTACTO', d_norm.get('ATENCION', 'N/A')),
-                                'EMAIL': d_norm.get('EMAIL', 'N/A'),
-                                'TELEFONO': d_norm.get('TELEFONO', 'N/A'),
-                                'EJECUTIVO_DUEÑO': nombre_ej
-                            }
-                            # Intentar obtener última actividad
-                            try:
-                                ws_res = sh_target.worksheet("COTIZACIONES_RESUMEN")
-                                resumenes = ws_res.get_all_records()
-                                res_final['ULTIMA_ACTIVIDAD'] = resumenes[-1].get('FECHA_ELABORACION', 'N/A') if resumenes else "Sin cotizaciones"
-                            except: res_final['ULTIMA_ACTIVIDAD'] = "N/A"
-                            
-                            resultados.append(res_final)
-                else: resumen_escaneo.append(f"❓ {nombre_ej}: Sin pestaña")
-            except Exception:
-                resumen_escaneo.append(f"❌ {nombre_ej}: Sin acceso")
+                if not ws_dir:
+                    resumen_escaneo.append(f"❓ {nombre_ej}: Sin pestaña")
+                    continue
+
+                # 3. Búsqueda de datos
+                datos_dir = ws_dir.get_all_records()
+                resumen_escaneo.append(f"✅ {nombre_ej}: {len(datos_dir)} reg.")
+                
+                for d in datos_dir:
+                    # Unir toda la fila para búsqueda profunda
+                    toda_la_fila = " ".join([str(v) for v in d.values()])
+                    if q_norm in normalizar(toda_la_fila):
+                        # Mapeo de campos normalizado
+                        d_norm = {str(k).upper().replace(" ", "_"): v for k, v in d.items()}
+                        res_final = {
+                            'RAZON_SOCIAL': d_norm.get('RAZON_SOCIAL', d_norm.get('CLIENTE', 'N/A')),
+                            'CONTACTO': d_norm.get('CONTACTO', d_norm.get('ATENCION', 'N/A')),
+                            'EMAIL': d_norm.get('EMAIL', 'N/A'),
+                            'TELEFONO': d_norm.get('TELEFONO', 'N/A'),
+                            'EJECUTIVO_DUEÑO': nombre_ej
+                        }
+                        
+                        # Intentar obtener la última actividad (Opcional)
+                        try:
+                            ws_res = sh_target.worksheet("COTIZACIONES_RESUMEN")
+                            recs_res = ws_res.get_all_records()
+                            res_final['ULTIMA_ACTIVIDAD'] = recs_res[-1].get('FECHA_ELABORACION', 'N/A') if recs_res else "Sin cotizaciones"
+                        except:
+                            res_final['ULTIMA_ACTIVIDAD'] = "N/A"
+                        
+                        resultados.append(res_final)
+
+            except Exception as e:
+                resumen_escaneo.append(f"❌ {nombre_ej}: Error en proceso")
                 continue 
     
     with st.expander("Detalle del escaneo (Diagnóstico)"):
