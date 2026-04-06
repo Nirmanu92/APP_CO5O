@@ -1923,8 +1923,8 @@ else:
 
                     else:
                         st.info("Aún no tienes cotizaciones registradas. ¡Crea la primera!")
-            except Exception as e:
-                st.error(f"Error cargando el Dashboard: {e}")
+                except Exception as e:
+                    st.error(f"Error cargando el Dashboard: {e}")
 
         # --- VISTA: METER PEDIDO (COTIZACIÓN GANADA) ---
         elif st.session_state.menu_actual == 'pedido':
