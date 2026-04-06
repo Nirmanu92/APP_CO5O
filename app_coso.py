@@ -1686,8 +1686,8 @@ else:
                             # Obtener info del detalle para este folio
                             det_f = df_det_all[df_det_all[df_det_all.columns[0]].astype(str) == f_id]
                             
-                            conceptos = ", ".join(det_f['CONCEPTO'].unique()) if 'CONCEPTO' in det_f.columns else "N/A"
-                            proveedores = ", ".join(det_f['PROVEEDOR'].unique()) if 'PROVEEDOR' in det_f.columns else "N/A"
+                            conceptos = ", ".join([str(x) for x in det_f['CONCEPTO'].unique()]) if 'CONCEPTO' in det_f.columns else "N/A"
+                            proveedores = ", ".join([str(x) for x in det_f['PROVEEDOR'].unique()]) if 'PROVEEDOR' in det_f.columns else "N/A"
                             estatus = row.get('ESTATUS', 'N/A')
                             if estatus == 'N/A' and len(row) > 13: estatus = row.iloc[13]
                             
@@ -2253,7 +2253,7 @@ else:
                     st.markdown(f"**Condiciones:** {st.session_state.get('condic_val', 'No seleccionado')}")
                     st.markdown(f"**Partidas:** {len(df_analisis)} conceptos")
 
-                st.write("**Conceptos a registrar:**", ", ".join(df_analisis["Concepto"].tolist()))
+                st.write("**Conceptos a registrar:**", ", ".join([str(x) for x in df_analisis["Concepto"].tolist()]))
                 
                 st.divider()
                 val_coment = st.session_state.get('coment_val', "")
