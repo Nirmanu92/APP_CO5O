@@ -1226,14 +1226,14 @@ else:
                     col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
                     col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
                     
-                    # --- CÁLCULO DE MÉTRICAS AVANZADAS ---
-                    # 1. Unir Resumen con montos del Detalle para métricas financieras
-                    df_montos = df_det_all.groupby(df_det_all.columns[0]).agg({
-                        'PFACTURA_TOTAL_IVA_INC': 'sum' if 'PFACTURA_TOTAL_IVA_INC' in df_det_all.columns else lambda x: pd.to_numeric(x, errors='coerce').sum()
+                    # 1. Unir Resumen con montos y utilidad del Detalle
+                    df_montos_util = df_det_all.groupby(df_det_all.columns[0]).agg({
+                        'PFACTURA_TOTAL_IVA_INC': 'sum' if 'PFACTURA_TOTAL_IVA_INC' in df_det_all.columns else lambda x: pd.to_numeric(x, errors='coerce').sum(),
+                        'UTILIDAD_TOTAL': 'sum' if 'UTILIDAD_TOTAL' in df_det_all.columns else lambda x: pd.to_numeric(x, errors='coerce').sum()
                     }).reset_index()
-                    df_montos.columns = [col_folio, 'MONTO_TOTAL']
+                    df_montos_util.columns = [col_folio, 'MONTO_TOTAL', 'UTILIDAD_TOTAL']
                     
-                    df_stats = pd.merge(df_resumen, df_montos, on=col_folio, how='left').fillna(0)
+                    df_stats = pd.merge(df_resumen, df_montos_util, on=col_folio, how='left').fillna(0)
                     
                     # 2. Definir universos
                     estatus_cerrados = ["100% Ganada", "0% Cancelada", "100% Pedido"]
@@ -1241,40 +1241,55 @@ else:
                     df_cerrados_stats = df_stats[df_stats['ESTATUS'].isin(estatus_cerrados)]
                     
                     monto_activo = df_activos_stats['MONTO_TOTAL'].sum()
+                    util_activa = df_activos_stats['UTILIDAD_TOTAL'].sum()
                     monto_ganado = df_stats[df_stats['ESTATUS'].isin(["100% Ganada", "100% Pedido"])]['MONTO_TOTAL'].sum()
                     
-                    st.subheader("Tu Desempeño")
+                    st.subheader("Tu Inteligencia de Negocio")
                     m1, m2, m3, m4 = st.columns(4)
-                    with m1: st.metric("Proyectos Activos", len(df_activos_stats), help="Cotizaciones en seguimiento")
-                    with m2: st.metric("Valor en Tubería", f"$ {monto_activo:,.0f}", help="Suma de montos en proyectos abiertos")
-                    with m3: st.metric("Proyectos Cerrados", len(df_cerrados_stats), help="Ganados y Cancelados")
-                    with m4: st.metric("Total Ganado", f"$ {monto_ganado:,.0f}", help="Suma de montos de proyectos al 100%")
+                    with m1: st.metric("Ventas Activas", f"$ {monto_activo:,.0f}", help="Valor total en la tubería")
+                    with m2: st.metric("Utilidad en Tubería", f"$ {util_activa:,.0f}", help="Suma de utilidad de proyectos abiertos")
+                    with m3: st.metric("Total Ganado", f"$ {monto_ganado:,.0f}", help="Suma de montos de proyectos al 100%")
+                    
+                    # Encontrar Proveedor más usado
+                    prov_top = df_det_all['PROVEEDOR'].mode().iloc[0] if not df_det_all.empty and 'PROVEEDOR' in df_det_all.columns else "N/A"
+                    with m4: st.metric("Proveedor Estrella", prov_top)
 
-                    # 3. Gráfica de Clientes Top
                     st.write("")
-                    c_g1, c_g2 = st.columns([2, 1])
                     
-                    with c_g1:
-                        # Top 7 Clientes por Monto
-                        df_chart = df_stats.groupby(col_cliente)['MONTO_TOTAL'].sum().sort_values(ascending=False).head(7).reset_index()
-                        if not df_chart.empty:
-                            import plotly.express as px
-                            fig = px.bar(df_chart, x='MONTO_TOTAL', y=col_cliente, orientation='h', 
-                                        title="Top Clientes por Monto Cotizado",
-                                        labels={'MONTO_TOTAL': 'Monto Total ($)', col_cliente: 'Cliente'},
-                                        color_discrete_sequence=['#3498DB'])
-                            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
-                                            font_color="white", height=300, margin=dict(l=20, r=20, t=40, b=20))
-                            st.plotly_chart(fig, use_container_width=True)
+                    # --- BLOQUE DE RANKINGS ---
+                    col_r1, col_r2 = st.columns(2)
                     
-                    with c_g2:
-                        # Distribución de Estatus
-                        df_pie = df_stats['ESTATUS'].value_counts().reset_index()
-                        fig_pie = px.pie(df_pie, values='count', names='ESTATUS', title="Mezcla de Proyectos",
-                                        color_discrete_sequence=px.colors.sequential.Blues_r)
-                        fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
-                                            font_color="white", height=300, showlegend=False, margin=dict(l=10, r=10, t=40, b=10))
-                        st.plotly_chart(fig_pie, use_container_width=True)
+                    with col_r1:
+                        st.markdown("### 💎 Proyectos más Rentables (Utilidad)")
+                        df_top_util = df_stats.sort_values('UTILIDAD_TOTAL', ascending=False).head(5)
+                        for _, r in df_top_util.iterrows():
+                            st.caption(f"**{r[col_folio]}** | {r[col_cliente]} | Util: ${r['UTILIDAD_TOTAL']:,.2f}")
+                        
+                        st.write("")
+                        st.markdown("### 📈 Top Clientes (Frecuencia)")
+                        df_top_clientes = df_stats[col_cliente].value_counts().head(5).reset_index()
+                        df_top_clientes.columns = ['Cliente', 'Cant']
+                        st.dataframe(df_top_clientes, use_container_width=True, hide_index=True)
+
+                    with col_r2:
+                        st.markdown("### 💰 Proyectos de Mayor Volumen")
+                        df_top_vol = df_stats.sort_values('MONTO_TOTAL', ascending=False).head(5)
+                        for _, r in df_top_vol.iterrows():
+                            st.caption(f"**{r[col_folio]}** | {r[col_cliente]} | Total: ${r['MONTO_TOTAL']:,.2f}")
+                        
+                        st.write("")
+                        # Listar Arrendamientos
+                        st.markdown("### 🏦 Radar de Arrendamientos")
+                        # Buscar en detalle folios que tengan Arrendamiento o Financiamiento
+                        folios_arr = []
+                        if 'FINANCIAMIENTO' in df_det_all.columns:
+                            folios_arr = df_det_all[df_det_all['FINANCIAMIENTO'].isin(['Arrendamiento', 'Financiamiento'])][df_det_all.columns[0]].unique()
+                        
+                        df_arr = df_stats[df_stats[col_folio].isin(folios_arr)]
+                        if not df_arr.empty:
+                            st.dataframe(df_arr[[col_folio, col_cliente, 'ESTATUS']], use_container_width=True, hide_index=True)
+                        else:
+                            st.info("No hay proyectos con financiera registrados.")
 
                     st.divider()
                     st.subheader("Historial Detallado")
