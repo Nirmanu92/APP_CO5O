@@ -1097,8 +1097,9 @@ def cargar_cotizacion_para_editar(row, df_resumen):
     # 1. Normalizar nombres de columnas del DataFrame de entrada
     row_norm = {str(k).upper().replace(" ", "_"): v for k, v in row.items()}
     
-    # 2. Identificar columnas clave
-    f_id = str(row_norm.get('FOLIO', next(iter(row.values()), ""))).strip()
+    # 2. Identificar columnas clave (Folio)
+    # Evitamos row.values() porque en Series de Pandas .values es un atributo, no una función.
+    f_id = str(row_norm.get('FOLIO', list(row)[0] if len(row)>0 else "")).strip()
     
     # 3. Limpieza de estados anteriores
     st.session_state.dict_fotos = {}
