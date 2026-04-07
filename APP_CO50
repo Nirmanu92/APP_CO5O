@@ -2086,7 +2086,7 @@ else:
                                         "moneda": st.session_state.get('moneda_val', 'MXN'),
                                         "tc": st.session_state.get('tc_val', 1.0)
                                     },
-                                    df_p_actual, 
+                                    df_p_final, 
                                     {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p},
                                     {
                                         "dir_entrega": dir_ent, 
