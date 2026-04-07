@@ -1,11 +1,6 @@
 # Credenciales y Secretos
 *.json
-!requirements.txt
-
-# Ignorar específicamente la cuenta de servicio y tokens
-manuel-hernandez-*.json
-token_*.json
-client_secrets.json
+!client_secrets.json.example
 
 # Archivos temporales de Python
 __pycache__/

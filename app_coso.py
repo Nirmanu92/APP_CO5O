@@ -47,6 +47,7 @@ FILE_JSON_SERVICE = "manuel-hernandez-d0db41fdbc21.json"
 ID_CARPETA_COTIZACIONES = "1KsDQi-jnVyoO9cQ_8asn2PVDyIUH0x_l"
 ID_CARPETA_IMAGENES = "1rekfucEG3U--N1otCQjnHl0j3hdGRwpg"
 ID_CARPETA_EVIDENCIAS = "19JnLfSSLh4ICq-gHZw0pQfcOpY9fmqj0"
+ID_SHEET_PEDIDOS = "1YJWY1C2OYpGypTyYWrXJRIZTU9jFwC_cvBwLNp2aQDE"
 
 # --- 1. AUTENTICACIÓN PARA SHEETS (CUENTA DE SERVICIO) ---
 @st.cache_resource
@@ -2027,14 +2028,44 @@ else:
                             with st.spinner("Procesando Pedido Central..."):
                                 gc = conectar_google_sheets()
                                 # CONEXIÓN CENTRAL
-                                try: sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
-                                except: 
-                                    st.error("No se pudo abrir el archivo central 'PEDIDOS_Y_FACTURAS'. Revisa permisos.")
-                                    st.stop()
+                                try:
+                                    # Intentar por ID (más seguro)
+                                    sh_pedidos = gc.open_by_key(ID_SHEET_PEDIDOS)
+                                except:
+                                    try:
+                                        # Fallback por nombre
+                                        sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
+                                    except:
+                                        st.error("No se pudo abrir el archivo central de pedidos. Revisa el ID y los permisos para 'app-coso@manuel-hernandez.iam.gserviceaccount.com'")
+                                        st.stop()
                                 
                                 ws_p = sh_pedidos.sheet1
                                 folio_actual = st.session_state.folio_val
                                 
+                                # --- ASEGURAR COLUMNAS DE CÁLCULO PARA EL PDF TÉCNICO ---
+                                df_p_final = df_p_actual.copy()
+                                db_prov = st.session_state.get('proveedores_db', [])
+                                mapa_iva = {p['PROVEEDOR']: (1.0 if p.get('SUMA_IVA', 'SI') == 'SI' else 1.16) for p in db_prov}
+                                tc = st.session_state.get('tc_val', 1.0)
+                                moneda_cot = st.session_state.get('moneda_val', 'MXN')
+
+                                def conv(precio, moneda_item):
+                                    if moneda_cot == "MXN" and moneda_item == "USD": return precio * tc
+                                    if moneda_cot == "USD" and moneda_item == "MXN": return precio / tc
+                                    return precio
+
+                                # Inyectar cálculos si no existen (viniendo del editor)
+                                if "Costo (Sub)" not in df_p_final.columns:
+                                    df_p_final["PM_C"] = df_p_final.apply(lambda r: conv(r.get("PM", 0), r.get("Moneda", "MXN")), axis=1)
+                                    df_p_final["Envio_P_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Prov", 0), r.get("Moneda", "MXN")), axis=1)
+                                    df_p_final["Envio_S_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Sec", 0), r.get("Moneda", "MXN")), axis=1)
+                                    divs = df_p_final["Proveedor"].map(mapa_iva).fillna(1.0)
+                                    
+                                    df_p_final["Costo (Sub)"] = (df_p_final["PM_C"] / divs) + df_p_final["Envio_P_C"]
+                                    df_p_final["Envio Sec"] = df_p_final["Envio_S_C"]
+                                    df_p_final["Venta (Sub)"] = (df_p_final["Costo (Sub)"] + df_p_final["Envio Sec"]) * (1 + (df_p_final.get("Util %", 15) / 100))
+                                    df_p_final["Venta (IVA)"] = df_p_final["Venta (Sub)"] * 1.16
+
                                 # Subir archivos a Drive
                                 link_pago = subir_archivo_a_drive(file_pago.read(), f"PAGO_{folio_actual}_{file_pago.name}", file_pago.type) if file_pago else ""
                                 link_po = subir_archivo_a_drive(file_po.read(), f"PO_{folio_actual}_{file_po.name}", file_po.type) if file_po else ""

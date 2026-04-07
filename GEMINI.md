@@ -1,35 +1,27 @@
-# Estado del Proyecto - APP CO5O
+# Estado del Proyecto - APP CO5O (PRODUCCIÓN)
 
-Este archivo sirve de memoria para que el agente Gemini CLI retome el trabajo sin perder contexto.
+## 🚀 Despliegue en la Nube (Completado)
+- **Plataforma:** Streamlit Community Cloud.
+- **URL:** https://appco5o-gunixkfb5hakxc6r5ufshk.streamlit.app/
+- **Repositorio:** Nirmanu92/APP_CO5O (Sincronizado vía GitHub).
 
-## 🛠️ Funcionalidades Implementadas
-- **Autenticación Híbrida:** 
-  - Google Sheets usa Cuenta de Servicio (JSON) para mantener datos en la "NUBE CIP".
-  - Google Drive usa OAuth (Cuentas personales) para que fotos y PDFs usen el espacio de cada ejecutivo.
-- **Dashboard de Inicio:** 
-  - Vista unificada que muestra métricas de desempeño (Cliente más cotizado, total de cotizaciones).
-  - Historial de las últimas 10 cotizaciones con buscador por folio/cliente.
-  - Botón de edición directa que carga partidas, imágenes y datos de contacto del emisor.
-- **Módulo "Meter Pedido" (Formalización):**
-  - Formulario completo para capturar datos de Facturación (RFC, Razón Social, Uso CFDI, Método Pago).
-  - Captura de datos de Logística (Dirección, Contacto, Teléfono, PO).
-  - **Generación de PDF Técnico:** Crea automáticamente un documento para Administración/Compras con desglose de costos, proveedores y datos de entrega.
-  - **Integración con Nube:** Registro automático en la pestaña "PEDIDOS" con link directo al PDF en Drive.
-  - **Actualización de Estatus:** Cambia automáticamente el estatus de la cotización a "100% Pedido".
-- **Interfaz y Diseño:**
-  - Fondo: `#030303` (Negro absoluto).
-  - Pestañas: Centradas, anchas (220px) y sin emojis.
-  - Estilo: Corporativo sobrio, sin emojis en botones ni mensajes.
-  - Enfoque de inputs: Azul (`#3498DB`).
-  - Tabla Financiera: Desglose total con colores (Verde para Costos, Amarillo para Ventas, Morado para Utilidad).
+## 🛠️ Arquitectura de Autenticación
+- **Google Sheets:** Usa Cuenta de Servicio (`app-coso@manuel-hernandez.iam.gserviceaccount.com`).
+- **Google Drive:** Sistema de OAuth Híbrido.
+  - Los tokens de los ejecutivos se guardan de forma persistente en la hoja `CONTROL_USUARIOS` (columna `TOKEN_DRIVE`).
+  - Esto evita que la conexión se pierda cuando la app se reinicia en la nube.
+- **Seguridad:** Los secretos sensibles se manejan exclusivamente a través de los *Secrets* de Streamlit.
 
-## 📁 Archivos de Configuración Listos
-- `requirements.txt`: Lista de librerías para la nube.
-- `.gitignore`: Configurado para proteger archivos JSON y tokens.
+## ✅ Funcionalidades Activas
+- Dashboard de Desempeño con gráficas de Plotly.
+- Generación de PDFs (Cotización, Remisión, Pedido Técnico).
+- Carga de imágenes directa a Drive desde el navegador.
+- Persistencia de datos en Sheets (Nube CIP).
 
-## 🚀 Próximos Pasos (El Plan)
-1. **Despliegue en la Nube:** Pendiente hasta que los ejecutivos tengan sus cuentas de Google listas.
+## 📌 Próximos Pasos
+1. **Monitoreo:** Validar que los PDFs se guarden correctamente en las carpetas de los nuevos ejecutivos.
+2. **Refinamiento:** Ajustar detalles estéticos si los usuarios lo solicitan.
 
-## 📌 Notas de Estilo
-- Máxima seriedad: Cero emojis.
-- Alta definición: CSS aplicado para evitar letras borrosas en fondos oscuros.
+## ⚠️ Notas Importantes
+- Siempre compartir carpetas de Drive con el correo de la cuenta de servicio antes de vincular.
+- No subir archivos JSON al repositorio de GitHub.
