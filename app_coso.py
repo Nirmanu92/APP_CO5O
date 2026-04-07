@@ -1143,6 +1143,7 @@ def cargar_datos_sesion_usuario():
             st.session_state.directorio = cargar_maestro("DIRECTORIO")
             st.session_state.terminos_db = cargar_maestro("TERMINOS")
             st.session_state.proveedores_db = cargar_maestro("PROVEEDORES")
+            st.session_state.datos_fiscales = cargar_maestro("DATOS_FISCALES")
                 
             st.session_state.datos_usuario_listos = True
     except Exception as e:
@@ -1928,146 +1929,123 @@ else:
 
         # --- VISTA: METER PEDIDO (COTIZACIÓN GANADA) ---
         elif st.session_state.menu_actual == 'pedido':
-            st.title(f"Formalizar Pedido: {st.session_state.folio_val}")
+            st.title(f"🚀 Formalizar Pedido: {st.session_state.folio_val}")
             
-            # Obtener datos del primer proveedor de la cotización para pre-llenar (si existe)
+            # 1. Obtener datos base
             df_p_actual = st.session_state.df_partidas
             prov_principal = df_p_actual["Proveedor"].iloc[0] if not df_p_actual.empty else ""
+            cliente_actual = st.session_state.get('cliente_sel', '')
             
-            # Buscar contactos en la DB de proveedores
-            info_prov = next((p for p in st.session_state.get('proveedores_db', []) if p['PROVEEDOR'] == prov_principal), {})
-            vendedor_prov = info_prov.get('VENDEDOR', '')
-            pm_prov = info_prov.get('PRODUCT_MANAGER', '')
+            # 2. Buscar datos fiscales del cliente
+            info_fiscal = next((f for f in st.session_state.get('datos_fiscales', []) if f.get('RAZON_SOCIAL') == cliente_actual or f.get('CLIENTE') == cliente_actual), {})
+            rfc_sugerido = info_fiscal.get('RFC', '')
+            credito_info = info_fiscal.get('CREDITO', 'Sin crédito')
 
-            with st.form("form_pedido_completo"):
-                # --- SECCIÓN 1: DATOS DE PROVEEDOR ---
-                st.markdown("### 🏢 Datos de Proveedor / Operación")
-                p1, p2, p3 = st.columns(3)
-                with p1:
-                    ejecutivo_ped = st.text_input("Ejecutivo Solicitante:", value=st.session_state.get('ejecutivo_nom', ''), disabled=True)
-                    proveedor_ped = st.text_input("Proveedor:", value=prov_principal, disabled=True)
-                    vendedor_ped = st.text_input("Vendedor Proveedor:", value=vendedor_prov)
-                with p2:
-                    fecha_ped = st.date_input("Fecha de Solicitud:", value=date.today(), disabled=True)
-                    prioridad_ped = st.selectbox("Prioridad:", ["Normal", "Urgente"])
-                    pm_ped = st.text_input("Product Manager (PM):", value=pm_prov)
-                with p3:
-                    vigencia_prov_ped = st.text_input("Vigencia Precio Prov:", placeholder="Ej. 15 días / 30 Abr")
-                    registro_op_ped = st.text_input("Núm. Registro Oportunidad:")
-                    folio_prov_ped = st.text_input("Folio Cotización Proveedor:")
-
-                pa1, pa2 = st.columns(2)
-                with pa1:
-                    es_arrendamiento = st.radio("¿Es Arrendamiento?", ["No", "Sí"], horizontal=True)
-                with pa2:
-                    financiera = st.text_input("Financiera involucrada:", disabled=(es_arrendamiento == "No"))
-
-                st.divider()
-
-                # --- SECCIÓN 2: DATOS DE FACTURACIÓN ---
-                st.markdown("### 📄 Datos de Facturación (Cliente)")
-                f1, f2 = st.columns(2)
+            with st.form("form_pedido_pro"):
+                # --- SECCIÓN 1: DATOS FISCALES Y PAGO ---
+                st.markdown("### 📄 Datos Fiscales y Facturación")
+                f1, f2, f3 = st.columns(3)
                 with f1:
-                    razon_social_ped = st.text_input("Razón Social:", value=st.session_state.get('cliente_sel', ''), disabled=True)
-                    rfc_ped = st.text_input("RFC del Cliente:")
+                    razon_f = st.text_input("Razón Social Fiscal:", value=cliente_actual)
+                    rfc_f = st.text_input("RFC:", value=rfc_sugerido)
                 with f2:
-                    usos_cfdi = [
-                        "G03 - Gastos en general", "P01 - Por definir", "I01 - Construcciones", 
-                        "I02 - Mobiliario y equipo de oficina", "I04 - Equipo de cómputo", 
-                        "I08 - Otros", "G01 - Adquisición de mercancías", "D01 - Honorarios médicos"
-                    ]
-                    uso_cfdi_ped = st.selectbox("Uso de CFDI:", usos_cfdi)
-                    metodo_pago_ped = st.selectbox("Método de Pago:", ["PUE - Pago en una sola exhibición", "PPD - Pago en parcialidades o diferido"])
+                    metodos_p = ["PUE - Pago en una sola exhibición", "PPD - Pago en parcialidades o diferido"]
+                    metodo_p = st.selectbox("Método de Pago:", metodos_p)
+                    usos_cfdi = ["G03 - Gastos en general", "P01 - Por definir", "CP01 - Pagos", "I04 - Equipo de cómputo", "I08 - Otros"]
+                    uso_cfdi = st.selectbox("Uso de CFDI:", usos_cfdi)
+                with f3:
+                    st.info(f"**Estatus de Crédito:**\n{credito_info}")
+                    condiciones_pago = st.text_input("Condiciones de Pago Final:", value=st.session_state.get('pago_val', ''))
 
                 st.divider()
 
-                # --- SECCIÓN 3: DATOS DE LOGÍSTICA ---
-                st.markdown("### 🚚 Datos de Logística / Entrega")
-                l1, l2, l3 = st.columns([2, 1, 1])
+                # --- SECCIÓN 2: LOGÍSTICA DETALLADA ---
+                st.markdown("### 🚚 Logística y Entrega")
+                l1, l2 = st.columns(2)
                 with l1:
-                    dir_entrega_ped = st.text_area("Dirección de Entrega:", value=st.session_state.get('entrega_val', ''))
+                    origen_ent = st.radio("Origen de Entrega:", ["Directo de Proveedor", "Desde Oficina CO5O"], horizontal=True)
+                    metodo_ent = st.radio("Método de Envío:", ["Paquetería", "Ruta Interna / Chofer", "Recolección Cliente"], horizontal=True)
                 with l2:
-                    persona_recibe_ped = st.text_input("Persona que recibe:")
-                with l3:
-                    tel_contacto_ped = st.text_input("Teléfono en sitio:")
+                    dir_ent = st.text_area("Dirección Completa de Entrega:", value=st.session_state.get('entrega_val', ''))
                 
-                num_po_ped = st.text_input("Número de Orden de Compra (PO):")
+                lc1, lc2, lc3 = st.columns(3)
+                with lc1: persona_rec = st.text_input("Persona que recibe:")
+                with lc2: tel_rec = st.text_input("Teléfono de quien recibe:")
+                with lc3: num_po = st.text_input("Orden de Compra (PO#):")
 
                 st.divider()
-                if st.form_submit_button("VALIDAR Y FORMALIZAR PEDIDO", use_container_width=True, type="primary"):
-                    if not rfc_ped or not persona_recibe_ped or not tel_contacto_ped:
-                        st.error("Por favor completa los campos obligatorios de Facturación y Logística.")
+
+                # --- SECCIÓN 3: ANEXOS (DOCUMENTACIÓN) ---
+                st.markdown("### 📎 Anexos del Pedido")
+                st.caption("Sube los documentos necesarios para procesar el pedido.")
+                a1, a2, a3 = st.columns(3)
+                with a1: file_pago = st.file_uploader("Comprobante de Pago", type=["pdf", "jpg", "png", "zip"])
+                with a2: file_po = st.file_uploader("Orden de Compra (PO)", type=["pdf", "jpg", "png"])
+                with a3: file_csf = st.file_uploader("Constancia Fiscal (CSF)", type=["pdf"])
+
+                st.divider()
+                
+                if st.form_submit_button("VALIDAR Y ENVIAR PEDIDO A OPERACIONES", use_container_width=True, type="primary"):
+                    if not rfc_f or not persona_rec or not tel_rec:
+                        st.error("Campos obligatorios: RFC, Persona que recibe y Teléfono.")
                     else:
                         try:
-                            with st.spinner("Registrando Pedido Maestro..."):
-                                sh = st.session_state.sh_personal
-                                try: ws_ped = sh.worksheet("PEDIDOS")
-                                except: ws_ped = sh.add_worksheet(title="PEDIDOS", rows="100", cols="25")
+                            with st.spinner("Procesando Pedido Central..."):
+                                gc = conectar_google_sheets()
+                                # CONEXIÓN CENTRAL
+                                try: sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
+                                except: 
+                                    st.error("No se pudo abrir el archivo central 'PEDIDOS_Y_FACTURAS'. Revisa permisos.")
+                                    st.stop()
                                 
-                                # Definir encabezados extendidos si es nueva
-                                headers = [
-                                    "FECHA", "FOLIO_INTERNO", "CLIENTE", "RFC", "USO_CFDI", "METODO_PAGO", 
-                                    "PROVEEDOR", "VENDEDOR_PROV", "PM_PROV", "PRIORIDAD", "VIGENCIA_PROV", 
-                                    "REGISTRO_OP", "FOLIO_PROV", "ARRENDAMIENTO", "FINANCIERA", "PO", 
-                                    "DIRECCION_ENTREGA", "RECIBE", "TEL_SITIO", "EJECUTIVO", "ESTATUS", "LINK_PDF_TECNICO"
+                                ws_p = sh_pedidos.sheet1
+                                folio_actual = st.session_state.folio_val
+                                
+                                # Subir archivos a Drive
+                                link_pago = subir_archivo_a_drive(file_pago.read(), f"PAGO_{folio_actual}_{file_pago.name}", file_pago.type) if file_pago else ""
+                                link_po = subir_archivo_a_drive(file_po.read(), f"PO_{folio_actual}_{file_po.name}", file_po.type) if file_po else ""
+                                link_csf = subir_archivo_a_drive(file_csf.read(), f"CSF_{folio_actual}.pdf", 'application/pdf') if file_csf else ""
+
+                                # Preparar PDF de Remisión y Pedido Técnico para el registro central
+                                pdf_t_blob = generar_pedido_tecnico_blob_v2(
+                                    {"folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, "cliente": cliente_actual, "prioridad": "Normal", "arrendamiento": "No"},
+                                    df_p_actual, 
+                                    {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p},
+                                    {"dir_entrega": dir_ent, "persona_recibe": persona_rec, "tel_contacto": tel_rec, "num_po": num_po},
+                                    {"vendedor": "", "pm": "", "vigencia_prov": "", "registro_op": "", "folio_prov": ""}
+                                )
+                                link_pdf_tecnico = subir_archivo_a_drive(pdf_t_blob, f"PEDIDO_TECNICO_{folio_actual}.pdf")
+
+                                # FILA MAESTRA (Ajustar a las columnas de tu sheet PEDIDOS_Y_FACTURAS)
+                                # Formato sugerido: Fecha, Folio, Ejecutivo, Cliente, RFC, Monto, Estatus, Origen, Metodo, Links...
+                                monto_total = (df_p_actual["Venta (IVA)"] * df_p_actual["Pzas"]).sum()
+                                
+                                row_maestra = [
+                                    str(date.today()), folio_actual, st.session_state.ejecutivo_nom, cliente_actual, 
+                                    rfc_f, metodo_p, uso_cfdi, condiciones_pago, 
+                                    origen_ent, metodo_ent, dir_ent, persona_rec, tel_rec, num_po,
+                                    monto_total, "PEDIDO NUEVO", link_pdf_tecnico, link_pago, link_po, link_csf
                                 ]
-                                if ws_ped.row_count == 1 and not ws_ped.cell(1,1).value:
-                                    ws_ped.update("A1", [headers])
+                                ws_p.append_row(row_maestra)
 
-                                # Generar PDF Técnico con los nuevos rubros
-                                cab_ped = {
-                                    "folio": st.session_state.folio_val,
-                                    "ejecutivo": st.session_state.ejecutivo_nom,
-                                    "cliente": st.session_state.cliente_sel,
-                                    "proveedor": prov_principal,
-                                    "prioridad": prioridad_ped,
-                                    "arrendamiento": es_arrendamiento,
-                                    "financiera": financiera
-                                }
-                                
-                                datos_fisc = {"rfc": rfc_ped, "razon_fiscal": razon_social_ped, "uso_cfdi": uso_cfdi_ped, "metodo_pago": metodo_pago_ped}
-                                datos_log = {"dir_entrega": dir_entrega_ped, "persona_recibe": persona_recibe_ped, "tel_contacto": tel_contacto_ped, "num_po": num_po_ped}
-                                datos_oper = {"vendedor": vendedor_ped, "pm": pm_ped, "vigencia_prov": vigencia_prov_ped, "registro_op": registro_op_ped, "folio_prov": folio_prov_ped}
-                                
-                                # Combinar datos para el PDF
-                                pdf_tecnico_blob = generar_pedido_tecnico_blob_v2(cab_ped, df_p_actual, datos_fisc, datos_log, datos_oper)
-                                link_pdf_t = subir_archivo_a_drive(pdf_tecnico_blob, f"PEDIDO_TECNICO_{st.session_state.folio_val}.pdf")
+                                # Actualizar estatus en la hoja PERSONAL del ejecutivo
+                                ws_res_local = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
+                                folios_local = ws_res_local.col_values(1)
+                                if str(folio_actual) in folios_local:
+                                    idx_l = folios_local.index(str(folio_actual)) + 1
+                                    ws_res_local.update_cell(idx_l, 14, "100% Ganada")
 
-                                # Registro en Sheet
-                                row_ped = [
-                                    str(date.today()), st.session_state.folio_val, st.session_state.cliente_sel, rfc_ped, uso_cfdi_ped, metodo_pago_ped,
-                                    prov_principal, vendedor_ped, pm_ped, prioridad_ped, vigencia_prov_ped,
-                                    registro_op_ped, folio_prov_ped, es_arrendamiento, financiera, num_po_ped,
-                                    dir_entrega_ped, persona_recibe_ped, tel_contacto_ped, st.session_state.usuario, "FORMALIZADO", link_pdf_t
-                                ]
-                                ws_ped.append_row(row_ped)
-
-                                # Actualizar estatus
-                                ws_res = sh.worksheet("COTIZACIONES_RESUMEN")
-                                folios = ws_res.col_values(1)
-                                if st.session_state.folio_val in folios:
-                                    idx = folios.index(st.session_state.folio_val) + 1
-                                    ws_res.update_cell(idx, 14, "100% Ganada")
-
-                                # Remisión
-                                st.session_state.remision_actual = generar_remision_blob(cab_ped, df_p_actual, st.session_state.get('dict_fotos', {}), st.session_state.get('dict_fotos_links', {}))
-                                
                                 st.session_state.pedido_exitoso = True
-                                st.session_state.pdf_tecnico_actual = pdf_tecnico_blob
+                                st.session_state.pdf_tecnico_actual = pdf_t_blob
                                 st.balloons()
                                 st.rerun()
                         except Exception as e:
-                            st.error(f"Error al formalizar: {e}")
+                            st.error(f"Error crítico al procesar pedido: {e}")
 
             if st.session_state.get('pedido_exitoso'):
-                st.success("✅ Pedido registrado y formalizado con éxito.")
-                c_ped1, c_ped2 = st.columns(2)
-                with c_ped1:
-                    st.download_button("Descargar Pedido Técnico (Admin)", data=st.session_state.pdf_tecnico_actual, file_name=f"PEDIDO_TECNICO_{st.session_state.folio_val}.pdf", use_container_width=True, type="primary")
-                with c_ped2:
-                    st.download_button("Descargar Remisión (Entrega)", data=st.session_state.remision_actual, file_name=f"Remision_{st.session_state.folio_val}.pdf", use_container_width=True)
-                
-                if st.button("Volver al Dashboard", use_container_width=True):
+                st.success("✅ Pedido enviado centralmente a Operaciones.")
+                st.download_button("Descargar Copia de Pedido Técnico", data=st.session_state.pdf_tecnico_actual, file_name=f"PEDIDO_{st.session_state.folio_val}.pdf", use_container_width=True)
+                if st.button("Volver al Dashboard"):
                     del st.session_state['pedido_exitoso']
                     st.session_state.menu_actual = 'menu'
                     st.rerun()
