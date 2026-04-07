@@ -2102,7 +2102,7 @@ else:
 
                                 # FILA MAESTRA (Ajustar a las columnas de tu sheet PEDIDOS_Y_FACTURAS)
                                 # Formato sugerido: Fecha, Folio, Ejecutivo, Cliente, RFC, Monto, Estatus, Origen, Metodo, Links...
-                                monto_total = (df_p_actual["Venta (IVA)"] * df_p_actual["Pzas"]).sum()
+                                monto_total = (df_p_final["Venta (IVA)"] * df_p_final["Pzas"]).sum()
                                 
                                 row_maestra = [
                                     str(date.today()), folio_actual, st.session_state.ejecutivo_nom, cliente_actual, 
