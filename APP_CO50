@@ -885,7 +885,7 @@ def generar_remision_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     return bytes(resultado)
 
 def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, datos_oper):
-    """Genera el PDF técnico avanzado para administración con los 3 rubros detallados."""
+    """Genera el PDF técnico avanzado para administración con los 3 rubros detallados, incluyendo precios de venta y comentarios."""
     pdf = PDF(format="letter", tipo_pdf='PEDIDO')
     pdf.set_auto_page_break(auto=True, margin=30)
     pdf.add_page()
@@ -933,105 +933,139 @@ def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, dato
     pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(*gris_texto)
     pdf.set_xy(113, y_bloques + 8)
-    pdf.multi_cell(80, 4, f"Dirección: {limpiar_texto(datos_log['dir_entrega'])}\nRecibe: {limpiar_texto(datos_log['persona_recibe'])}\nTel: {limpiar_texto(datos_log['tel_contacto'])}\nPO: {limpiar_texto(datos_log['num_po'])}")
+    pdf.multi_cell(80, 4, f"Origen: {limpiar_texto(datos_log.get('origen', 'N/A'))}\nMétodo: {limpiar_texto(datos_log.get('metodo', 'N/A'))}\nDirección: {limpiar_texto(datos_log['dir_entrega'])}\nRecibe: {limpiar_texto(datos_log['persona_recibe'])}\nTel: {limpiar_texto(datos_log['tel_contacto'])}\nPO: {limpiar_texto(datos_log['num_po'])}")
 
     pdf.ln(5)
     
     # --- BLOQUE 2: DATOS DE PROVEEDOR Y OPERACIÓN ---
     y_oper = pdf.get_y() + 5
     pdf.set_fill_color(*gris_suave)
-    pdf.rect(15, y_oper, 185, 30, "F")
+    pdf.rect(15, y_oper, 185, 25, "F")
     
     pdf.set_xy(18, y_oper + 3)
     pdf.set_font("helvetica", "B", 9)
     pdf.set_text_color(*azul_corp)
-    pdf.cell(180, 5, "DATOS DE PROVEEDOR Y OPERACIÓN", ln=True)
+    pdf.cell(180, 5, "DATOS DE OPERACIÓN", ln=True)
     
     pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(*gris_texto)
     pdf.set_x(18)
     c1, c2, c3 = 60, 60, 60
     # Fila 1 Operación
-    pdf.cell(c1, 4, f"Proveedor: {limpiar_texto(cab['proveedor'])}")
-    pdf.cell(c2, 4, f"Vendedor: {limpiar_texto(datos_oper['vendedor'])}")
-    pdf.cell(c3, 4, f"PM: {limpiar_texto(datos_oper['pm'])}", ln=True)
+    pdf.cell(c1, 4, f"Ejecutivo: {limpiar_texto(cab['ejecutivo'])}")
+    pdf.cell(c2, 4, f"Arrendamiento: {cab.get('arrendamiento', 'No')}")
+    pdf.cell(c3, 4, f"Financiera: {limpiar_texto(cab.get('financiera', 'N/A'))}", ln=True)
     # Fila 2 Operación
     pdf.set_x(18)
-    pdf.cell(c1, 4, f"Folio Prov: {limpiar_texto(datos_oper['folio_prov'])}")
-    pdf.cell(c2, 4, f"Vigencia Precio: {limpiar_texto(datos_oper['vigencia_prov'])}")
-    pdf.cell(c3, 4, f"Registro Op: {limpiar_texto(datos_oper['registro_op'])}", ln=True)
-    # Fila 3 Operación
-    pdf.set_x(18)
-    pdf.cell(c1, 4, f"Arrendamiento: {cab['arrendamiento']}")
-    pdf.cell(c2, 4, f"Financiera: {limpiar_texto(cab.get('financiera', 'N/A'))}")
-    pdf.cell(c3, 4, f"Ejecutivo: {limpiar_texto(cab['ejecutivo'])}", ln=True)
+    pdf.cell(c1, 4, f"Moneda: {limpiar_texto(cab.get('moneda', 'MXN'))}")
+    pdf.cell(c2, 4, f"T. Cambio: {cab.get('tc', 1.0)}")
+    pdf.cell(c3, 4, f"Vendedor Prov: {limpiar_texto(datos_oper.get('vendedor', 'N/A'))}", ln=True)
 
-    # --- TABLA DE PRODUCTOS (COSTOS) ---
-    pdf.set_xy(15, y_oper + 35)
+    # --- TABLA DE PRODUCTOS (DESGLOSE COMPLETO) ---
+    pdf.set_xy(15, y_oper + 30)
     pdf.set_fill_color(*azul_corp)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", "B", 8)
+    pdf.set_font("helvetica", "B", 7)
     
-    w_cant, w_desc, w_sku, w_unit, w_total = 10, 100, 25, 25, 25
+    w_cant, w_desc, w_sku, w_prov, w_costo, w_venta, w_util = 8, 65, 25, 25, 20, 20, 22
     pdf.cell(w_cant, 8, "CANT", 0, 0, "C", True)
-    pdf.cell(w_desc, 8, " CONCEPTO / DESCRIPCIÓN TÉCNICA", 0, 0, "L", True)
+    pdf.cell(w_desc, 8, " CONCEPTO / DESCRIPCIÓN", 0, 0, "L", True)
     pdf.cell(w_sku, 8, "SKU", 0, 0, "L", True)
-    pdf.cell(w_unit, 8, "COSTO U.", 0, 0, "R", True)
-    pdf.cell(w_total, 8, "TOTAL C.", 0, 1, "R", True)
+    pdf.cell(w_prov, 8, "PROVEEDOR", 0, 0, "L", True)
+    pdf.cell(w_costo, 8, "COSTO U.", 0, 0, "R", True)
+    pdf.cell(w_venta, 8, "VENTA U.", 0, 0, "R", True)
+    pdf.cell(w_util, 8, "UTIL. TOTAL", 0, 1, "R", True)
 
     pdf.set_text_color(*gris_texto)
     for i, (idx, row) in enumerate(df_partidas.iterrows()):
-        pdf.set_font("helvetica", "", 8)
+        pdf.set_font("helvetica", "", 7)
         desc_limpia = f"{limpiar_texto(row['Concepto'])}\n{limpiar_texto(row['Descripción'])}"
-        lineas = len(pdf.multi_cell(w_desc - 4, 4, desc_limpia, split_only=True))
-        h_fila = max((lineas * 4) + 4, 10)
+        lineas = len(pdf.multi_cell(w_desc - 4, 3.5, desc_limpia, split_only=True))
+        h_fila = max((lineas * 3.5) + 4, 10)
 
-        if pdf.get_y() + h_fila > 250:
+        if pdf.get_y() + h_fila > 240:
             pdf.add_page()
             pdf.set_y(35)
             # Re-encabezado
             pdf.set_fill_color(*azul_corp)
             pdf.set_text_color(255, 255, 255)
-            pdf.set_font("helvetica", "B", 8)
+            pdf.set_font("helvetica", "B", 7)
             pdf.cell(w_cant, 8, "CANT", 0, 0, "C", True)
-            pdf.cell(w_desc, 8, " CONCEPTO / DESCRIPCIÓN TÉCNICA", 0, 0, "L", True)
+            pdf.cell(w_desc, 8, " CONCEPTO / DESCRIPCIÓN", 0, 0, "L", True)
             pdf.cell(w_sku, 8, "SKU", 0, 0, "L", True)
-            pdf.cell(w_unit, 8, "COSTO U.", 0, 0, "R", True)
-            pdf.cell(w_total, 8, "TOTAL C.", 0, 1, "R", True)
+            pdf.cell(w_prov, 8, "PROVEEDOR", 0, 0, "L", True)
+            pdf.cell(w_costo, 8, "COSTO U.", 0, 0, "R", True)
+            pdf.cell(w_venta, 8, "VENTA U.", 0, 0, "R", True)
+            pdf.cell(w_util, 8, "UTIL. TOTAL", 0, 1, "R", True)
             pdf.set_text_color(*gris_texto)
 
         y_antes = pdf.get_y()
         pdf.set_fill_color(252, 252, 252) if i % 2 == 0 else pdf.set_fill_color(*gris_suave)
         pdf.rect(15, y_antes, 185, h_fila, "F")
 
-        pdf.set_font("helvetica", "B", 9)
+        pdf.set_font("helvetica", "B", 8)
         pdf.cell(w_cant, h_fila, str(int(row['Pzas'])), 0, 0, "C")
         
         x_desc = pdf.get_x()
         pdf.set_xy(x_desc + 2, y_antes + 2)
-        pdf.multi_cell(w_desc - 4, 3.5, desc_limpia)
+        pdf.multi_cell(w_desc - 4, 3, desc_limpia)
         
         pdf.set_xy(x_desc + w_desc, y_antes)
         pdf.cell(w_sku, h_fila, limpiar_texto(row.get('SKU', '')))
+        pdf.cell(w_prov, h_fila, limpiar_texto(row.get('Proveedor', '')))
         
         costo_u = row.get('Costo (Sub)', 0)
-        costo_t = costo_u * row['Pzas']
-        pdf.cell(w_unit, h_fila, f"$ {costo_u:,.2f}", 0, 0, "R")
-        pdf.set_font("helvetica", "B", 9)
-        pdf.cell(w_total, h_fila, f"$ {costo_t:,.2f}", 0, 1, "R")
+        venta_u = row.get('Venta (Sub)', 0)
+        util_t = (venta_u - costo_u - row.get('Envio Sec', 0)) * row['Pzas']
+        
+        pdf.cell(w_costo, h_fila, f"$ {costo_u:,.2f}", 0, 0, "R")
+        pdf.cell(w_venta, h_fila, f"$ {venta_u:,.2f}", 0, 0, "R")
+        pdf.set_font("helvetica", "B", 8)
+        pdf.cell(w_util, h_fila, f"$ {util_t:,.2f}", 0, 1, "R")
         
         pdf.set_y(y_antes + h_fila)
 
-    # --- TOTALES Y FIRMAS ---
+    # --- TOTALES Y COMENTARIOS ---
     pdf.ln(5)
-    if pdf.get_y() > 220: pdf.add_page(); pdf.set_y(35)
+    if pdf.get_y() > 200: pdf.add_page(); pdf.set_y(35)
     
-    total_inversion = (df_partidas['Costo (Sub)'] * df_partidas['Pzas']).sum()
-    pdf.set_x(135)
+    y_final = pdf.get_y()
+    
+    # Comentarios y Términos
+    pdf.set_xy(15, y_final)
+    pdf.set_font("helvetica", "B", 9)
+    pdf.set_text_color(*azul_corp)
+    pdf.cell(100, 5, "COMENTARIOS Y RESUMEN EJECUTIVO", ln=True)
+    pdf.set_font("helvetica", "", 8)
+    pdf.set_text_color(*gris_texto)
+    pdf.set_x(15)
+    pdf.multi_cell(100, 3.5, limpiar_texto(cab.get('comentarios', 'Sin comentarios adicionales.')))
+    
+    pdf.ln(2)
+    pdf.set_x(15)
+    pdf.set_font("helvetica", "B", 8)
+    pdf.cell(100, 4, "TÉRMINOS COMERCIALES:", ln=True)
+    pdf.set_font("helvetica", "", 7)
+    pdf.set_x(15)
+    pdf.multi_cell(100, 3, f"Entrega: {limpiar_texto(cab.get('entrega', 'N/A'))}\nPago: {limpiar_texto(cab.get('pago', 'N/A'))}\nCondiciones: {limpiar_texto(cab.get('condiciones', 'N/A'))}")
+
+    # Cuadro de Totales
+    total_costo = (df_partidas['Costo (Sub)'] * df_partidas['Pzas']).sum()
+    total_venta = (df_partidas['Venta (Sub)'] * df_partidas['Pzas']).sum()
+    total_util = total_venta - total_costo - (df_partidas['Envio Sec'] * df_partidas['Pzas']).sum()
+    
+    pdf.set_xy(125, y_final)
+    pdf.set_font("helvetica", "B", 9)
+    pdf.set_text_color(*gris_texto)
+    pdf.cell(35, 6, "Total Inversión:", 0, 0)
+    pdf.cell(30, 6, f"$ {total_costo:,.2f}", 0, 1, "R")
+    pdf.set_x(125)
+    pdf.cell(35, 6, "Total Venta (Sub):", 0, 0)
+    pdf.cell(30, 6, f"$ {total_venta:,.2f}", 0, 1, "R")
+    pdf.set_x(125)
     pdf.set_fill_color(*azul_corp)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", "B", 10)
-    pdf.cell(65, 10, f"TOTAL INVERSIÓN: $ {total_inversion:,.2f}  ", 0, 1, "C", True)
+    pdf.cell(65, 8, f"UTILIDAD: $ {total_util:,.2f}", 0, 1, "C", True)
 
     pdf.ln(10)
     y_firmas = pdf.get_y()
@@ -2008,10 +2042,29 @@ else:
 
                                 # Preparar PDF de Remisión y Pedido Técnico para el registro central
                                 pdf_t_blob = generar_pedido_tecnico_blob_v2(
-                                    {"folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, "cliente": cliente_actual, "prioridad": "Normal", "arrendamiento": "No"},
+                                    {
+                                        "folio": folio_actual, 
+                                        "ejecutivo": st.session_state.ejecutivo_nom, 
+                                        "cliente": cliente_actual, 
+                                        "prioridad": "Normal", 
+                                        "arrendamiento": "No",
+                                        "comentarios": st.session_state.get('coment_val', ''),
+                                        "entrega": st.session_state.get('entrega_val', ''),
+                                        "pago": st.session_state.get('pago_val', ''),
+                                        "condiciones": st.session_state.get('condic_val', ''),
+                                        "moneda": st.session_state.get('moneda_val', 'MXN'),
+                                        "tc": st.session_state.get('tc_val', 1.0)
+                                    },
                                     df_p_actual, 
                                     {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p},
-                                    {"dir_entrega": dir_ent, "persona_recibe": persona_rec, "tel_contacto": tel_rec, "num_po": num_po},
+                                    {
+                                        "dir_entrega": dir_ent, 
+                                        "persona_recibe": persona_rec, 
+                                        "tel_contacto": tel_rec, 
+                                        "num_po": num_po,
+                                        "origen": origen_ent,
+                                        "metodo": metodo_ent
+                                    },
                                     {"vendedor": "", "pm": "", "vigencia_prov": "", "registro_op": "", "folio_prov": ""}
                                 )
                                 link_pdf_tecnico = subir_archivo_a_drive(pdf_t_blob, f"PEDIDO_TECNICO_{folio_actual}.pdf")
