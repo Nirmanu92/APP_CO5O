@@ -1177,7 +1177,7 @@ def cargar_datos_sesion_usuario():
             st.session_state.directorio = cargar_maestro("DIRECTORIO")
             st.session_state.terminos_db = cargar_maestro("TERMINOS")
             st.session_state.proveedores_db = cargar_maestro("PROVEEDORES")
-            st.session_state.datos_fiscales = cargar_maestro("DATOS_FISCALES")
+            st.session_state.datos_fiscales = cargar_maestro("DATOS FISCALES")
                 
             st.session_state.datos_usuario_listos = True
     except Exception as e:
