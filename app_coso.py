@@ -85,6 +85,11 @@ def conectar_google_sheets():
     return None
 
 # --- FUNCIONES DE LECTURA CON CACHÉ (PROTECCIÓN DE CUOTA API 429) ---
+def normalizar_registros(registros):
+    """Convierte todas las llaves de los registros a MAYÚSCULAS_Y_GUIONES_BAJOS."""
+    if not registros: return []
+    return [{str(k).upper().replace(" ", "_"): v for k, v in r.items()} for r in registros]
+
 @st.cache_data(ttl=600) # Guardar en memoria por 10 minutos
 def obtener_datos_maestros_cached(nombre_archivo, nombre_ws="sheet1"):
     """Lee datos maestros con caché para ahorrar cuota de API."""
@@ -93,7 +98,7 @@ def obtener_datos_maestros_cached(nombre_archivo, nombre_ws="sheet1"):
         sh = gc.open(nombre_archivo)
         try: ws = sh.worksheet(nombre_ws)
         except: ws = sh.get_worksheet(0)
-        return ws.get_all_records()
+        return normalizar_registros(ws.get_all_records())
     except:
         return []
 
@@ -119,11 +124,11 @@ def obtener_directorio_ejecutivo_cached(sheet_id, usuario_id):
         for name in ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "Contactos", "CONTACTOS", "HOJA1", "Hoja1"]:
             try:
                 data = sh.worksheet(name).get_all_records()
-                if data: return data
+                if data: return normalizar_registros(data)
             except: continue
             
         # Último recurso: primera hoja disponible
-        return sh.get_worksheet(0).get_all_records()
+        return normalizar_registros(sh.get_worksheet(0).get_all_records())
     except Exception as e:
         return None # Error de acceso o permisos
 
@@ -1176,26 +1181,32 @@ def cargar_datos_sesion_usuario():
             
             # --- CARGA DE DATOS MAESTROS (PROVEEDORES, TERMINOS, DIRECTORIO) ---
             def cargar_maestro(nombre_ws):
+                """Lee datos y normaliza las llaves (headers) a MAYÚSCULAS_Y_GUIONES_BAJOS."""
+                def normalizar_registros(registros):
+                    if not registros: return []
+                    return [{str(k).upper().replace(" ", "_"): v for k, v in r.items()} for r in registros]
+
                 # 1. Intentar en hoja personal
                 try:
-                    return st.session_state.sh_personal.worksheet(nombre_ws).get_all_records()
+                    recs = st.session_state.sh_personal.worksheet(nombre_ws).get_all_records()
+                    return normalizar_registros(recs)
                 except:
                     # 2. Intentar en Archivo Central (variaciones de nombre)
                     for file_name in ["TERMINOS_Y_CONDICIONES", "TERMINOS Y CONDICIONES"]:
                         try:
                             sh_m = gc.open(file_name)
-                            # Intentar por nombre solicitado, luego Hoja1, luego el primer sheet disponible
                             for ws_name in [nombre_ws, "Hoja1", "HOJA1", "Sheet1"]:
                                 try:
                                     recs = sh_m.worksheet(ws_name).get_all_records()
-                                    if recs: return recs
+                                    if recs: return normalizar_registros(recs)
                                 except: continue
-                            return sh_m.get_worksheet(0).get_all_records()
+                            return normalizar_registros(sh_m.get_worksheet(0).get_all_records())
                         except: continue
                     
                     # 3. Intentar como archivo independiente
                     try:
-                        return gc.open(nombre_ws).sheet1.get_all_records()
+                        recs = gc.open(nombre_ws).sheet1.get_all_records()
+                        return normalizar_registros(recs)
                     except:
                         return []
 
@@ -1209,16 +1220,7 @@ def cargar_datos_sesion_usuario():
         st.error(f"Error al conectar con la base de datos personal: {e}")
         st.stop()
 
-# --- 1. CARGA SÓLO USUARIOS PARA LOGIN ---
-def cargar_usuarios_login():
-    if 'usuarios_db' not in st.session_state:
-        try:
-            gc = conectar_google_sheets()
-            # Cargamos solo la hoja de usuarios al inicio para validar el acceso
-            st.session_state.usuarios_db = gc.open("CONTROL_USUARIOS").sheet1.get_all_records()
-        except Exception as e:
-            st.error(f"Error cargando lista de acceso: {e}")
-
+# --- 1. GESTIÓN DE EDICIÓN ---
 def cargar_cotizacion_para_editar(row, df_resumen):
     """Extrae toda la lógica de carga de una cotización de forma robusta."""
     # 1. Normalizar nombres de columnas del DataFrame de entrada
@@ -1535,12 +1537,14 @@ def renderizar_dashboard_operaciones():
 # Esta función debe correr antes de que Streamlit detenga el flujo por el Login
 procesar_callback_oauth()
 
+# Asegurar que la base de usuarios esté cargada siempre (evita AttributeError en refrescos de sesión)
+cargar_usuarios_login()
+
 # --- LÓGICA DE LOGIN ---
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
 if not st.session_state.autenticado:
-    cargar_usuarios_login()
     
     # Contenedor de Login Centrado - Columnas más anchas a los lados para achicar el centro
     _, col_l2, _ = st.columns([1.5, 1, 1.5]) 
@@ -2214,7 +2218,7 @@ else:
                 st.divider()
                 col_c1, col_c2 = st.columns(2)
                 with col_c1:
-                    lista_rs = sorted(list(set([c['RAZON_SOCIAL'] for c in st.session_state.directorio if c['RAZON_SOCIAL']])))
+                    lista_rs = sorted(list(set([c.get('RAZON_SOCIAL') for c in st.session_state.directorio if c.get('RAZON_SOCIAL')])))
                     opciones_rs = ["Seleccionar..."] + lista_rs
                     val_rs_actual = st.session_state.get('cliente_sel', 'Seleccionar...')
                     idx_rs = opciones_rs.index(val_rs_actual) if val_rs_actual in opciones_rs else 0
@@ -2223,7 +2227,7 @@ else:
                 
                 with col_c2:
                     if cliente_sel != "Seleccionar...":
-                        contactos = sorted(list(set([c['CONTACTO'] for c in st.session_state.directorio if c['RAZON_SOCIAL'] == cliente_sel])))
+                        contactos = sorted(list(set([c.get('CONTACTO') for c in st.session_state.directorio if c.get('RAZON_SOCIAL') == cliente_sel and c.get('CONTACTO')])))
                         opciones_c = ["Seleccionar..."] + contactos
                         val_c_actual = st.session_state.get('contacto_sel', 'Seleccionar...')
                         idx_c = opciones_c.index(val_c_actual) if val_c_actual in opciones_c else 0
