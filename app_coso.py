@@ -1184,31 +1184,54 @@ def cargar_datos_sesion_usuario():
                 """Lee datos y normaliza las llaves (headers) a MAYÚSCULAS_Y_GUIONES_BAJOS."""
                 def normalizar_registros(registros):
                     if not registros: return []
-                    return [{str(k).upper().replace(" ", "_"): v for k, v in r.items()} for r in registros]
+                    res = []
+                    for r in registros:
+                        # Limpiar llaves y convertir a mayúsculas
+                        norm = {str(k).upper().strip().replace(" ", "_"): v for k, v in r.items()}
+                        
+                        # Robustez extra para DIRECTORIO: mapear alias comunes
+                        if nombre_ws == "DIRECTORIO":
+                            # Mapear CLIENTE o EMPRESA a RAZON_SOCIAL si no existe
+                            if "RAZON_SOCIAL" not in norm:
+                                for alias in ["CLIENTE", "EMPRESA", "RAZON_SOCIAL_FISCAL"]:
+                                    if alias in norm:
+                                        norm["RAZON_SOCIAL"] = norm[alias]
+                                        break
+                            # Mapear ATENCION a CONTACTO
+                            if "CONTACTO" not in norm and "ATENCION" in norm:
+                                norm["CONTACTO"] = norm["ATENCION"]
+                        res.append(norm)
+                    return res
 
-                # 1. Intentar en hoja personal
+                # 1. Intentar en hoja personal (con robustez para DIRECTORIO)
+                pestanas_intento = [nombre_ws]
+                if nombre_ws == "DIRECTORIO":
+                    pestanas_intento = ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "Contactos", "CONTACTOS", "HOJA1", "Hoja1"]
+                
+                for p in pestanas_intento:
+                    try:
+                        recs = st.session_state.sh_personal.worksheet(p).get_all_records()
+                        if recs: return normalizar_registros(recs)
+                    except: continue
+
+                # 2. Intentar en Archivo Central (variaciones de nombre)
+                for file_name in ["TERMINOS_Y_CONDICIONES", "TERMINOS Y CONDICIONES"]:
+                    try:
+                        sh_m = gc.open(file_name)
+                        for ws_name in pestanas_intento + ["Hoja1", "HOJA1", "Sheet1"]:
+                            try:
+                                recs = sh_m.worksheet(ws_name).get_all_records()
+                                if recs: return normalizar_registros(recs)
+                            except: continue
+                        return normalizar_registros(sh_m.get_worksheet(0).get_all_records())
+                    except: continue
+                
+                # 3. Intentar como archivo independiente
                 try:
-                    recs = st.session_state.sh_personal.worksheet(nombre_ws).get_all_records()
+                    recs = gc.open(nombre_ws).sheet1.get_all_records()
                     return normalizar_registros(recs)
                 except:
-                    # 2. Intentar en Archivo Central (variaciones de nombre)
-                    for file_name in ["TERMINOS_Y_CONDICIONES", "TERMINOS Y CONDICIONES"]:
-                        try:
-                            sh_m = gc.open(file_name)
-                            for ws_name in [nombre_ws, "Hoja1", "HOJA1", "Sheet1"]:
-                                try:
-                                    recs = sh_m.worksheet(ws_name).get_all_records()
-                                    if recs: return normalizar_registros(recs)
-                                except: continue
-                            return normalizar_registros(sh_m.get_worksheet(0).get_all_records())
-                        except: continue
-                    
-                    # 3. Intentar como archivo independiente
-                    try:
-                        recs = gc.open(nombre_ws).sheet1.get_all_records()
-                        return normalizar_registros(recs)
-                    except:
-                        return []
+                    return []
 
             st.session_state.directorio = cargar_maestro("DIRECTORIO")
             st.session_state.terminos_db = cargar_maestro("TERMINOS")
