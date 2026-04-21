@@ -183,29 +183,42 @@ def procesar_callback_oauth():
                     token_data["client_id"] = client_config['client_id']
                     token_data["client_secret"] = client_config['client_secret']
                     
-                    # --- GUARDADO PERSISTENTE EN GOOGLE SHEETS ---
-                    gc = conectar_google_sheets()
-                    ws_users = gc.open("CONTROL_USUARIOS").sheet1
-                    usuarios_list = ws_users.col_values(1) # Asumiendo columna 1 es USUARIO
-                    
-                    if usuario_regreso in usuarios_list:
-                        fila_idx = usuarios_list.index(usuario_regreso) + 1
-                        # Buscar o crear columna TOKEN
-                        headers = ws_users.row_values(1)
-                        if "TOKEN_DRIVE" not in headers:
-                            ws_users.update_cell(1, len(headers) + 1, "TOKEN_DRIVE")
-                            col_idx = len(headers) + 1
-                        else:
-                            col_idx = headers.index("TOKEN_DRIVE") + 1
-                        
-                        ws_users.update_cell(fila_idx, col_idx, json.dumps(token_data))
-                    
-                    st.success(f"¡Drive de {usuario_regreso} conectado con éxito!")
-                    st.query_params.clear()
-                    time.sleep(2)
-                    st.rerun()
+                    if guardar_token_drive(usuario_regreso, token_data):
+                        st.success(f"¡Drive de {usuario_regreso} conectado con éxito!")
+                        st.query_params.clear()
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error("No se pudo guardar el token en la base de datos.")
         except Exception as e:
             st.error(f"Error técnico en vinculación: {e}")
+
+def guardar_token_drive(usuario, token_data):
+    """Guarda el token de Drive en Google Sheets y limpia la caché."""
+    try:
+        gc = conectar_google_sheets()
+        sh = gc.open("CONTROL_USUARIOS")
+        ws_users = sh.sheet1
+        usuarios_list = ws_users.col_values(1)
+        
+        if usuario in usuarios_list:
+            fila_idx = usuarios_list.index(usuario) + 1
+            headers = ws_users.row_values(1)
+            if "TOKEN_DRIVE" not in headers:
+                ws_users.update_cell(1, len(headers) + 1, "TOKEN_DRIVE")
+                col_idx = len(headers) + 1
+            else:
+                col_idx = headers.index("TOKEN_DRIVE") + 1
+            
+            ws_users.update_cell(fila_idx, col_idx, json.dumps(token_data))
+            # LIMPIAR CACHÉ para que la app lea los nuevos datos inmediatamente
+            obtener_datos_maestros_cached.clear()
+            if 'usuarios_db' in st.session_state:
+                del st.session_state.usuarios_db
+            return True
+    except Exception as e:
+        st.error(f"Error al guardar token: {e}")
+    return False
 
 def autenticar_usuario_oauth():
     """Genera el link de autorización manual."""
@@ -267,12 +280,23 @@ def obtener_drive_service():
             if creds and creds.expired and creds.refresh_token:
                 try:
                     creds.refresh(Request())
-                    # Opcional: Actualizar el token en el sheet si se refrescó (para la próxima vez)
-                except: pass
+                    # Guardar el nuevo token generado tras el refresh
+                    new_token_data = json.loads(creds.to_json())
+                    # Asegurar que mantenemos client_id/secret si to_json no los incluyó (depende de la versión)
+                    if "client_id" not in new_token_data: new_token_data["client_id"] = token_data.get("client_id")
+                    if "client_secret" not in new_token_data: new_token_data["client_secret"] = token_data.get("client_secret")
+                    
+                    guardar_token_drive(usuario, new_token_data)
+                except Exception as e:
+                    # Si falla el refresh (ej. invalid_grant), devolvemos None para forzar re-vinculación
+                    return None
             
+            # Si el token sigue expirado y no hay refresh_token, o falló lo anterior
+            if creds and creds.expired and not creds.refresh_token:
+                return None
+                
             return build('drive', 'v3', credentials=creds)
     except Exception as e:
-        # st.write(f"Debug Drive: {e}") # Descomentar para ver errores de conexión
         return None
     return None
 
@@ -1674,12 +1698,24 @@ else:
                         col_folio_det = df_det_norm.columns[0]
 
                         # Identificar columnas de monto y utilidad de forma robusta
-                        col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL_CON_IVA" in c or "PFACTURA_TOTAL_IVA_INC" in c), df_det_norm.columns[-3])
-                        col_util_src = next((c for c in df_det_norm.columns if "UTILIDAD_TOTAL" in c), df_det_norm.columns[-1])
+                        col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL" in c or "PFACTURA" in c), df_det_norm.columns[-3])
+                        # Búsqueda muy flexible para Utilidad
+                        col_util_src = next((c for c in df_det_norm.columns if "UTILIDAD" in c or "UTIL_$" in c), None)
+                        
+                        # Si no encuentra por nombre, usar el índice típico de la columna T (índice 19)
+                        if not col_util_src:
+                            col_util_src = df_det_norm.columns[19] if len(df_det_norm.columns) > 19 else df_det_norm.columns[-1]
+
+                        def clean_num(x):
+                            if isinstance(x, str):
+                                # Eliminar $, comas y espacios para convertir a número puro
+                                limpio = x.replace("$", "").replace(",", "").replace(" ", "").strip()
+                                return pd.to_numeric(limpio, errors='coerce')
+                            return pd.to_numeric(x, errors='coerce')
 
                         df_montos_util = df_det_norm.groupby(col_folio_det).agg({
-                            col_monto_src: lambda x: pd.to_numeric(x, errors='coerce').sum(),
-                            col_util_src: lambda x: pd.to_numeric(x, errors='coerce').sum()
+                            col_monto_src: lambda x: x.apply(clean_num).sum(),
+                            col_util_src: lambda x: x.apply(clean_num).sum()
                         }).reset_index()
                         df_montos_util.columns = [col_folio, 'MONTO_TOTAL', 'UTILIDAD_TOTAL']
 
@@ -2500,16 +2536,22 @@ else:
                                 dict_links_drive = st.session_state.get('dict_fotos_links', {}).copy()
                                 if st.session_state.dict_fotos:
                                     for idx_f, bytes_f in st.session_state.dict_fotos.items():
-                                        bytes_f.seek(0)
-                                        link_d = subir_archivo_a_drive(bytes_f.read(), f"Partida_{folio_actual}_{idx_f}.png", 'image/png')
-                                        if link_d: dict_links_drive[idx_f] = link_d
+                                        try:
+                                            bytes_f.seek(0)
+                                            link_d = subir_archivo_a_drive(bytes_f.read(), f"Partida_{folio_actual}_{idx_f}.png", 'image/png')
+                                            if link_d: dict_links_drive[idx_f] = link_d
+                                        except Exception as e:
+                                            st.warning(f"No se pudo subir la imagen de la partida {idx_f}: {e}")
                                 
                                 dict_evidencias_drive = st.session_state.get('dict_evidencias_links', {}).copy()
                                 if st.session_state.get('dict_evidencias'):
-                                    for idx_ev, file_ev in st.session_state.dict_evidencias.items():
-                                        file_ev.seek(0)
-                                        link_ev = subir_archivo_a_drive(file_ev.read(), f"Evidencia_{folio_actual}_{idx_ev}_{file_ev.name}", file_ev.type)
-                                        if link_ev: dict_evidencias_drive[idx_ev] = link_ev
+                                    for idx_ev, file_ev in st.session_state.get('dict_evidencias').items():
+                                        try:
+                                            file_ev.seek(0)
+                                            link_ev = subir_archivo_a_drive(file_ev.read(), f"Evidencia_{folio_actual}_{idx_ev}_{file_ev.name}", file_ev.type)
+                                            if link_ev: dict_evidencias_drive[idx_ev] = link_ev
+                                        except Exception as e:
+                                            st.warning(f"No se pudo subir el archivo de evidencia {idx_ev}: {e}")
 
                                 ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
                                 folios_res = ws_res.col_values(1)
@@ -2534,7 +2576,11 @@ else:
                                 pdf_blob = generar_pdf_blob(cab, df_analisis, st.session_state.dict_fotos, dict_links_drive)
 
                                 nombre_pdf = f"{folio_actual}.pdf"
-                                link_pdf_drive = subir_archivo_a_drive(pdf_blob, nombre_pdf, 'application/pdf')
+                                link_pdf_drive = ""
+                                try:
+                                    link_pdf_drive = subir_archivo_a_drive(pdf_blob, nombre_pdf, 'application/pdf')
+                                except Exception as e:
+                                    st.error(f"Error crítico: No se pudo subir el PDF a Drive. {e}")
                                 
                                 # Registro en Resumen (Persistencia de Moneda y TC en O y P, Último Contacto en Q)
                                 datos_res = [
