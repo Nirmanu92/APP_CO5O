@@ -1133,31 +1133,40 @@ def cargar_datos_sesion_usuario():
             datos_user = next((u for u in st.session_state.usuarios_db if u['USUARIO'] == st.session_state.usuario), None)
             
             if not datos_user:
-                st.error("No se encontró configuración para este usuario.")
+                st.error(f"No se encontró configuración para el usuario: {st.session_state.usuario}")
                 st.stop()
             
             # Abrir su hoja personal (ID_SHEET es el estándar en este proyecto)
-            sheet_id = datos_user.get('ID_SHEET') or datos_user.get('SPREADSHEET_ID')
+            sheet_id = str(datos_user.get('ID_SHEET') or datos_user.get('SPREADSHEET_ID') or "").strip()
             
-            if sheet_id:
-                st.session_state.sh_personal = gc.open_by_key(sheet_id)
-            else:
-                # Intento por nombre si no hay ID configurado
-                try:
-                    st.session_state.sh_personal = gc.open(f"COTIZACIONES_{st.session_state.usuario}")
-                except:
-                    # Segundo intento: Solo el nombre del usuario (sin prefijo)
+            try:
+                if sheet_id and len(sheet_id) > 20:
+                    st.session_state.sh_personal = gc.open_by_key(sheet_id)
+                else:
+                    # Intento por nombre si no hay ID configurado
                     try:
+                        st.session_state.sh_personal = gc.open(f"COTIZACIONES_{st.session_state.usuario}")
+                    except:
                         st.session_state.sh_personal = gc.open(st.session_state.usuario)
-                    except Exception as e:
-                        # Si falla, mostramos un error más claro
-                        st.error(f"No se encontró la hoja personal para el usuario: {st.session_state.usuario}")
-                        st.info("Asegúrese de que existe una hoja con su nombre y que esté compartida con la cuenta de servicio.")
-                        st.stop()
+                
+                # DIAGNÓSTICO EXITOSO (Solo para depuración si el directorio falla)
+                # st.toast(f"Conectado a: {st.session_state.sh_personal.title}")
+                
+            except Exception as e:
+                st.error(f"❌ Error al abrir la hoja personal de {st.session_state.usuario}")
+                st.info(f"Detalle técnico: {e}")
+                st.markdown(f"""
+                **Posibles soluciones:**
+                1. Verifique que el archivo existe en Drive.
+                2. Asegúrese de haber compartido el archivo con: `app-coso@manuel-hernandez.iam.gserviceaccount.com` como **Editor**.
+                3. El ID configurado es: `{sheet_id if sheet_id else 'No definido'}`
+                """)
+                st.stop()
             
             # --- CARGA DE DATOS MAESTROS (PROVEEDORES, TERMINOS, DIRECTORIO) ---
             def cargar_maestro(nombre_ws):
                 """Lee datos y normaliza las llaves (headers) a MAYÚSCULAS_Y_GUIONES_BAJOS."""
+                log_errores = []
                 def normalizar_registros(registros):
                     if not registros: return []
                     res = []
@@ -1167,13 +1176,11 @@ def cargar_datos_sesion_usuario():
                         
                         # Robustez extra para DIRECTORIO: mapear alias comunes
                         if nombre_ws == "DIRECTORIO":
-                            # Mapear CLIENTE o EMPRESA a RAZON_SOCIAL si no existe
                             if "RAZON_SOCIAL" not in norm:
-                                for alias in ["CLIENTE", "EMPRESA", "RAZON_SOCIAL_FISCAL"]:
+                                for alias in ["CLIENTE", "EMPRESA", "RAZON_SOCIAL_FISCAL", "NOMBRE_CLIENTE"]:
                                     if alias in norm:
                                         norm["RAZON_SOCIAL"] = norm[alias]
                                         break
-                            # Mapear ATENCION a CONTACTO
                             if "CONTACTO" not in norm and "ATENCION" in norm:
                                 norm["CONTACTO"] = norm["ATENCION"]
                         res.append(norm)
@@ -1186,9 +1193,22 @@ def cargar_datos_sesion_usuario():
                 
                 for p in pestanas_intento:
                     try:
-                        recs = st.session_state.sh_personal.worksheet(p).get_all_records()
+                        ws = st.session_state.sh_personal.worksheet(p)
+                        recs = ws.get_all_records()
                         if recs: return normalizar_registros(recs)
-                    except: continue
+                        else: log_errores.append(f"Pestaña '{p}' encontrada pero está VACÍA.")
+                    except: 
+                        continue
+
+                # Si llegamos aquí y es DIRECTORIO, mostrar advertencia de diagnóstico
+                if nombre_ws == "DIRECTORIO":
+                    todas_las_pestanas = [w.title for w in st.session_state.sh_personal.worksheets()]
+                    st.warning(f"⚠️ No se encontró la información de clientes en el archivo: '{st.session_state.sh_personal.title}'")
+                    with st.expander("Ver diagnóstico de pestañas"):
+                        st.write(f"Pestañas buscadas: {pestanas_intento}")
+                        st.write(f"Pestañas existentes en el archivo: {todas_las_pestanas}")
+                        if log_errores: st.write(f"Notas: {log_errores}")
+                        st.info("Sugerencia: Cambie el nombre de la pestaña de clientes a 'DIRECTORIO' o 'CLIENTES'.")
 
                 # 2. Intentar en Archivo Central (variaciones de nombre)
                 for file_name in ["TERMINOS_Y_CONDICIONES", "TERMINOS Y CONDICIONES"]:
