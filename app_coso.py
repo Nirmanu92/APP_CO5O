@@ -1232,36 +1232,50 @@ def cargar_datos_sesion_usuario():
                 if nombre_ws == "DIRECTORIO":
                     pestanas_intento = ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "Contactos", "CONTACTOS", "HOJA1", "Hoja1"]
                 
-                for p in pestanas_intento:
+                # --- NUEVO: ESCANEO DINÁMICO SI LAS PESTAÑAS ESTÁNDAR FALLAN ---
+                def intentar_leer_pestana(ws_obj):
                     try:
-                        ws = st.session_state.sh_personal.worksheet(p)
-                        
                         # INTENTO 1: get_all_records (Estándar)
-                        recs = ws.get_all_records()
-                        
+                        recs = ws_obj.get_all_records()
                         # INTENTO 2: get_all_values (Crudo) - Si el 1 falló o salió vacío
                         if not recs:
-                            all_vals = ws.get_all_values()
+                            all_vals = ws_obj.get_all_values()
                             if len(all_vals) > 0:
-                                # Buscar la primera fila que no esté vacía para usarla como encabezado
                                 header_idx = 0
                                 for i, row in enumerate(all_vals):
                                     if any(str(cell).strip() for cell in row):
                                         header_idx = i
                                         break
-                                
                                 headers = [str(h).strip() for h in all_vals[header_idx]]
                                 if headers:
                                     data_body = all_vals[header_idx+1:]
                                     recs = [dict(zip(headers, row)) for row in data_body if any(str(c).strip() for c in row)]
-                        
-                        if recs: 
-                            return normalizar_registros(recs)
-                        else: 
-                            log_errores.append(f"Pestaña '{p}' encontrada pero no se detectaron filas con datos.")
-                    except Exception as e: 
-                        log_errores.append(f"Error en pestaña '{p}': {str(e)}")
-                        continue
+                        return recs
+                    except: return None
+
+                # Primero intentar con los nombres conocidos
+                for p in pestanas_intento:
+                    try:
+                        ws = st.session_state.sh_personal.worksheet(p)
+                        data = intentar_leer_pestana(ws)
+                        if data: return normalizar_registros(data)
+                        log_errores.append(f"Pestaña '{p}' encontrada pero sin datos legibles.")
+                    except: continue
+
+                # SI FALLA: Buscar por palabras clave en todas las pestañas
+                if nombre_ws == "DIRECTORIO":
+                    todas_ws = st.session_state.sh_personal.worksheets()
+                    palabras_clave = ["CLIEN", "PROSP", "DIR", "BASE", "CONTACT", "HOJA", "SHEET"]
+                    for ws in todas_ws:
+                        nombre_up = ws.title.upper()
+                        if any(pc in nombre_up for pc in palabras_clave):
+                            data = intentar_leer_pestana(ws)
+                            if data: return normalizar_registros(data)
+                    
+                    # ÚLTIMO RECURSO: Primera pestaña que tenga algo
+                    for ws in todas_ws:
+                        data = intentar_leer_pestana(ws)
+                        if data: return normalizar_registros(data)
 
                 # Si llegamos aquí y es DIRECTORIO, mostrar advertencia de diagnóstico
                 if nombre_ws == "DIRECTORIO":
