@@ -1190,23 +1190,40 @@ def cargar_datos_sesion_usuario():
             # --- CARGA DE DATOS MAESTROS (PROVEEDORES, TERMINOS, DIRECTORIO) ---
             def cargar_maestro(nombre_ws):
                 """Lee datos y normaliza las llaves (headers) a MAYÚSCULAS_Y_GUIONES_BAJOS."""
+                import unicodedata
                 log_errores = []
+                
+                def limpiar_llave(txt):
+                    if not txt: return ""
+                    # Quitar tildes y normalizar
+                    s = "".join(c for c in unicodedata.normalize('NFD', str(txt)) if unicodedata.category(c) != 'Mn')
+                    return s.upper().strip().replace(" ", "_")
+
                 def normalizar_registros(registros):
                     if not registros: return []
                     res = []
                     for r in registros:
-                        # Limpiar llaves y convertir a mayúsculas
-                        norm = {str(k).upper().strip().replace(" ", "_"): v for k, v in r.items()}
+                        # Limpiar llaves y convertir a formato estándar
+                        norm = {limpiar_llave(k): v for k, v in r.items()}
                         
-                        # Robustez extra para DIRECTORIO: mapear alias comunes
+                        # Robustez extrema para DIRECTORIO
                         if nombre_ws == "DIRECTORIO":
                             if "RAZON_SOCIAL" not in norm:
-                                for alias in ["CLIENTE", "EMPRESA", "RAZON_SOCIAL_FISCAL", "NOMBRE_CLIENTE"]:
+                                # Buscar cualquier variante de Razón Social o Cliente
+                                for alias in ["CLIENTE", "EMPRESA", "RAZON_SOCIAL_FISCAL", "NOMBRE_CLIENTE", "NOMBRE", "RS"]:
                                     if alias in norm:
                                         norm["RAZON_SOCIAL"] = norm[alias]
                                         break
-                            if "CONTACTO" not in norm and "ATENCION" in norm:
-                                norm["CONTACTO"] = norm["ATENCION"]
+                                # Si sigue sin existir, tomar la primera columna como Razón Social
+                                if "RAZON_SOCIAL" not in norm and norm:
+                                    primera_llave = list(norm.keys())[0]
+                                    norm["RAZON_SOCIAL"] = norm[primera_llave]
+                                    
+                            if "CONTACTO" not in norm:
+                                for alias in ["ATENCION", "PERSONA", "CONTACTO_DIRECTO"]:
+                                    if alias in norm:
+                                        norm["CONTACTO"] = norm[alias]
+                                        break
                         res.append(norm)
                     return res
 
