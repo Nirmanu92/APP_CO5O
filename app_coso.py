@@ -1235,21 +1235,46 @@ def cargar_datos_sesion_usuario():
                 for p in pestanas_intento:
                     try:
                         ws = st.session_state.sh_personal.worksheet(p)
+                        
+                        # INTENTO 1: get_all_records (Estándar)
                         recs = ws.get_all_records()
-                        if recs: return normalizar_registros(recs)
-                        else: log_errores.append(f"Pestaña '{p}' encontrada pero está VACÍA.")
-                    except: 
+                        
+                        # INTENTO 2: get_all_values (Crudo) - Si el 1 falló o salió vacío
+                        if not recs:
+                            all_vals = ws.get_all_values()
+                            if len(all_vals) > 0:
+                                # Buscar la primera fila que no esté vacía para usarla como encabezado
+                                header_idx = 0
+                                for i, row in enumerate(all_vals):
+                                    if any(str(cell).strip() for cell in row):
+                                        header_idx = i
+                                        break
+                                
+                                headers = [str(h).strip() for h in all_vals[header_idx]]
+                                if headers:
+                                    data_body = all_vals[header_idx+1:]
+                                    recs = [dict(zip(headers, row)) for row in data_body if any(str(c).strip() for c in row)]
+                        
+                        if recs: 
+                            return normalizar_registros(recs)
+                        else: 
+                            log_errores.append(f"Pestaña '{p}' encontrada pero no se detectaron filas con datos.")
+                    except Exception as e: 
+                        log_errores.append(f"Error en pestaña '{p}': {str(e)}")
                         continue
 
                 # Si llegamos aquí y es DIRECTORIO, mostrar advertencia de diagnóstico
                 if nombre_ws == "DIRECTORIO":
                     todas_las_pestanas = [w.title for w in st.session_state.sh_personal.worksheets()]
+                    file_id_actual = st.session_state.sh_personal.id
                     st.warning(f"⚠️ No se encontró la información de clientes en el archivo: '{st.session_state.sh_personal.title}'")
-                    with st.expander("Ver diagnóstico de pestañas"):
-                        st.write(f"Pestañas buscadas: {pestanas_intento}")
-                        st.write(f"Pestañas existentes en el archivo: {todas_las_pestanas}")
-                        if log_errores: st.write(f"Notas: {log_errores}")
-                        st.info("Sugerencia: Cambie el nombre de la pestaña de clientes a 'DIRECTORIO' o 'CLIENTES'.")
+                    with st.expander("🔍 DIAGNÓSTICO TÉCNICO (Para Administrador)"):
+                        st.write(f"**ID del Archivo:** `{file_id_actual}`")
+                        st.write(f"**Pestañas encontradas:** {todas_las_pestanas}")
+                        if log_errores:
+                            st.write("**Notas del sistema:**")
+                            for err in log_errores: st.write(f"- {err}")
+                        st.info("💡 Verifique que el ID coincida con su hoja actual y que la pestaña de clientes tenga datos desde la fila 1 o 2.")
 
                 # 2. Intentar en Archivo Central (variaciones de nombre)
                 for file_name in ["TERMINOS_Y_CONDICIONES", "TERMINOS Y CONDICIONES"]:
