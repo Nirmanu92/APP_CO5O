@@ -2263,8 +2263,9 @@ else:
 
             st.divider()
 
-            if st.button("VALIDAR Y ENVIAR PEDIDO A OPERACIONES", use_container_width=True, type="primary"):                    if not rfc_f or not persona_rec or not tel_rec or not file_respaldo:
-                        st.error("Campos obligatorios: RFC, Persona que recibe, Teléfono y el Documento de Respaldo (Pago/OC).")
+            if st.button("VALIDAR Y ENVIAR PEDIDO A OPERACIONES", use_container_width=True, type="primary"):
+                if not rfc_f or not persona_rec or not tel_rec or not file_respaldo:
+                    st.error("Campos obligatorios: RFC, Persona que recibe, Teléfono y el Documento de Respaldo (Pago/OC).")
                     else:
                         try:
                             with st.spinner("Procesando Pedido Central..."):
