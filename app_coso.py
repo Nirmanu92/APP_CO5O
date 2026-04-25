@@ -2269,6 +2269,13 @@ else:
                 else:
                     try:
                         with st.spinner("Procesando Pedido Central..."):
+                            gc = conectar_google_sheets()
+                            try: sh_pedidos = gc.open_by_key(ID_SHEET_PEDIDOS)
+                            except: sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
+                            
+                            ws_p = sh_pedidos.sheet1
+                            folio_actual = st.session_state.folio_val
+
                             # --- CÁLCULOS DINÁMICOS PARA EL PEDIDO ---
                             df_p_final = st.session_state.df_partidas.copy()
                             db_prov = st.session_state.get('proveedores_db', [])
