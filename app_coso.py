@@ -2116,20 +2116,35 @@ else:
             credito_info = info_fiscal.get('CREDITO', 'Sin crédito')
 
             with st.form("form_pedido_pro"):
-                # --- SECCIÓN 1: DATOS FISCALES Y PAGO ---
+                # --- SECCIÓN 1: DATOS FISCALES Y FACTURACIÓN ---
                 st.markdown("### 📄 Datos Fiscales y Facturación")
-                f1, f2, f3 = st.columns(3)
+                f1, f2 = st.columns(2)
                 with f1:
                     razon_f = st.text_input("Razón Social Fiscal:", value=cliente_actual)
                     rfc_f = st.text_input("RFC:", value=rfc_sugerido)
                 with f2:
                     metodos_p = ["PUE - Pago en una sola exhibición", "PPD - Pago en parcialidades o diferido"]
                     metodo_p = st.selectbox("Método de Pago:", metodos_p)
-                    usos_cfdi = ["G03 - Gastos en general", "P01 - Por definir", "CP01 - Pagos", "I04 - Equipo de cómputo", "I08 - Otros"]
+                    usos_cfdi = [
+                        "G01 - Adquisición de mercancías",
+                        "G03 - Gastos en general",
+                        "I01 - Construcciones",
+                        "I02 - Mobiliario y equipo de oficina por inversiones",
+                        "I04 - Equipo de cómputo y accesorios",
+                        "I08 - Otra maquinaria y equipo",
+                        "S01 - Sin efectos fiscales",
+                        "CP01 - Pagos",
+                        "CN01 - Nómina",
+                        "D01 - Honorarios médicos, dentales y gastos hospitalarios",
+                        "D02 - Gastos médicos por incapacidad o discapacidad",
+                        "D03 - Gastos funerales",
+                        "D04 - Donativos",
+                        "D10 - Pagos por servicios educativos (colegiaturas)"
+                    ]
                     uso_cfdi = st.selectbox("Uso de CFDI:", usos_cfdi)
-                with f3:
-                    st.info(f"**Estatus de Crédito:**\n{credito_info}")
-                    condiciones_pago = st.text_input("Condiciones de Pago Final:", value=st.session_state.get('pago_val', ''))
+                
+                # Mover Condiciones de Pago a una variable interna (sin widget en esta sección)
+                condiciones_pago = st.session_state.get('pago_val', '')
 
                 st.divider()
 
