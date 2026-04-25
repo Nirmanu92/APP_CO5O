@@ -2152,15 +2152,15 @@ else:
                 st.markdown("### 🚚 Logística y Entrega")
                 l1, l2 = st.columns(2)
                 with l1:
-                    origen_ent = st.radio("Origen de Entrega:", ["Directo de Proveedor", "Desde Oficina CO5O"], horizontal=True)
-                    metodo_ent = st.radio("Método de Envío:", ["Paquetería", "Ruta Interna / Chofer", "Recolección Cliente"], horizontal=True)
+                    origen_ent = st.radio("Origen de entrega:", ["Directo proveedor", "Directo de oficina"], horizontal=True)
+                    metodo_ent = st.radio("Método:", ["Paquetería", "Ruta interna", "recolección de cliente"], horizontal=True)
                 with l2:
-                    dir_ent = st.text_area("Dirección Completa de Entrega:", value=st.session_state.get('entrega_val', ''))
+                    dir_ent = st.text_area("Dirección completa a entregar:", value=st.session_state.get('entrega_val', ''))
                 
                 lc1, lc2, lc3 = st.columns(3)
                 with lc1: persona_rec = st.text_input("Persona que recibe:")
                 with lc2: tel_rec = st.text_input("Teléfono de quien recibe:")
-                with lc3: num_po = st.text_input("Orden de Compra (PO#):")
+                with lc3: maps_link = st.text_input("Link de ubicación Maps:")
 
                 st.divider()
 
@@ -2246,7 +2246,7 @@ else:
                                         "dir_entrega": dir_ent, 
                                         "persona_recibe": persona_rec, 
                                         "tel_contacto": tel_rec, 
-                                        "num_po": num_po,
+                                        "maps": maps_link,
                                         "origen": origen_ent,
                                         "metodo": metodo_ent
                                     },
@@ -2261,7 +2261,7 @@ else:
                                 row_maestra = [
                                     str(date.today()), folio_actual, st.session_state.ejecutivo_nom, cliente_actual, 
                                     rfc_f, metodo_p, uso_cfdi, condiciones_pago, 
-                                    origen_ent, metodo_ent, dir_ent, persona_rec, tel_rec, num_po,
+                                    origen_ent, metodo_ent, dir_ent, persona_rec, tel_rec, maps_link,
                                     monto_total, "PEDIDO NUEVO", link_pdf_tecnico, link_pago, link_po, link_csf
                                 ]
                                 ws_p.append_row(row_maestra)
