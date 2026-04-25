@@ -2269,71 +2269,71 @@ else:
                 else:
                     try:
                         with st.spinner("Procesando Pedido Central..."):
-                                # ... (conexión y cálculos omitidos por brevedad)
-                                gc = conectar_google_sheets()
-                                try: sh_pedidos = gc.open_by_key(ID_SHEET_PEDIDOS)
-                                except: sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
-                                
-                                ws_p = sh_pedidos.sheet1
-                                folio_actual = st.session_state.folio_val
-                                
-                                # Subir archivos nuevos
-                                link_pago = subir_archivo_a_drive(file_respaldo.read(), f"RESPALDO_{folio_actual}_{file_respaldo.name}", file_respaldo.type) if file_respaldo else ""
-                                link_csf = subir_archivo_a_drive(file_csf.read(), f"CSF_{folio_actual}.pdf", 'application/pdf') if file_csf else ""
-                                link_arr = ""
-                                if pago_cliente == "Financiamiento" and 'file_arrendamiento' in locals() and file_arrendamiento:
-                                    link_arr = subir_archivo_a_drive(file_arrendamiento.read(), f"ARR_{folio_actual}_{file_arrendamiento.name}", file_arrendamiento.type)
+                            # ... (conexión y cálculos omitidos por brevedad)
+                            gc = conectar_google_sheets()
+                            try: sh_pedidos = gc.open_by_key(ID_SHEET_PEDIDOS)
+                            except: sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
+                            
+                            ws_p = sh_pedidos.sheet1
+                            folio_actual = st.session_state.folio_val
+                            
+                            # Subir archivos nuevos
+                            link_pago = subir_archivo_a_drive(file_respaldo.read(), f"RESPALDO_{folio_actual}_{file_respaldo.name}", file_respaldo.type) if file_respaldo else ""
+                            link_csf = subir_archivo_a_drive(file_csf.read(), f"CSF_{folio_actual}.pdf", 'application/pdf') if file_csf else ""
+                            link_arr = ""
+                            if pago_cliente == "Financiamiento" and 'file_arrendamiento' in locals() and file_arrendamiento:
+                                link_arr = subir_archivo_a_drive(file_arrendamiento.read(), f"ARR_{folio_actual}_{file_arrendamiento.name}", file_arrendamiento.type)
 
-                                # Preparar datos para el PDF
-                                p_final_str = f"{pago_cliente} ({dias_credito if pago_cliente == 'Linea de crédito' else vigencia_fin})"
-                                
-                                pdf_t_blob = generar_pedido_tecnico_blob_v2(
-                                    {
-                                        "folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, 
-                                        "cliente": cliente_actual, "prioridad": "Normal", 
-                                        "arrendamiento": "Sí" if pago_cliente == "Financiamiento" else "No",
-                                        "financiera": financiera_fin,
-                                        "comentarios": st.session_state.get('coment_val', ''),
-                                        "entrega": st.session_state.get('entrega_val', ''),
-                                        "pago": p_final_str,
-                                        "condiciones": st.session_state.get('condic_val', ''),
-                                        "moneda": st.session_state.get('moneda_val', 'MXN'),
-                                        "tc": st.session_state.get('tc_val', 1.0)
-                                    },
-                                    st.session_state.df_partidas, # Se asume df_partidas listo
-                                    {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p},
-                                    {
-                                        "dir_entrega": dir_ent, "persona_recibe": persona_rec, 
-                                        "tel_contacto": tel_rec, "maps": maps_link,
-                                        "origen": origen_ent, "metodo": metodo_ent
-                                    },
-                                    {"vendedor": "", "pm": "", "vigencia_prov": "", "registro_op": "", "folio_prov": ""},
-                                    detalles_compra=detalles_compra
-                                )
-                                link_pdf_tecnico = subir_archivo_a_drive(pdf_t_blob, f"PEDIDO_TECNICO_{folio_actual}.pdf")
+                            # Preparar datos para el PDF
+                            p_final_str = f"{pago_cliente} ({dias_credito if pago_cliente == 'Linea de crédito' else vigencia_fin})"
+                            
+                            pdf_t_blob = generar_pedido_tecnico_blob_v2(
+                                {
+                                    "folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, 
+                                    "cliente": cliente_actual, "prioridad": "Normal", 
+                                    "arrendamiento": "Sí" if pago_cliente == "Financiamiento" else "No",
+                                    "financiera": financiera_fin,
+                                    "comentarios": st.session_state.get('coment_val', ''),
+                                    "entrega": st.session_state.get('entrega_val', ''),
+                                    "pago": p_final_str,
+                                    "condiciones": st.session_state.get('condic_val', ''),
+                                    "moneda": st.session_state.get('moneda_val', 'MXN'),
+                                    "tc": st.session_state.get('tc_val', 1.0)
+                                },
+                                st.session_state.df_partidas, # Se asume df_partidas listo
+                                {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p},
+                                {
+                                    "dir_entrega": dir_ent, "persona_recibe": persona_rec, 
+                                    "tel_contacto": tel_rec, "maps": maps_link,
+                                    "origen": origen_ent, "metodo": metodo_ent
+                                },
+                                {"vendedor": "", "pm": "", "vigencia_prov": "", "registro_op": "", "folio_prov": ""},
+                                detalles_compra=detalles_compra
+                            )
+                            link_pdf_tecnico = subir_archivo_a_drive(pdf_t_blob, f"PEDIDO_TECNICO_{folio_actual}.pdf")
 
-                                # Registro en Sheet Central (Aumentar columnas para capturar los nuevos datos)
-                                row_maestra = [
-                                    str(date.today()), folio_actual, st.session_state.ejecutivo_nom, cliente_actual, 
-                                    rfc_f, metodo_p, uso_cfdi, p_final_str, 
-                                    origen_ent, metodo_ent, dir_ent, persona_rec, tel_rec, maps_link,
-                                    0, "PEDIDO NUEVO", link_pdf_tecnico, link_pago, link_arr, link_csf
-                                ]
-                                ws_p.append_row(row_maestra)
+                            # Registro en Sheet Central (Aumentar columnas para capturar los nuevos datos)
+                            row_maestra = [
+                                str(date.today()), folio_actual, st.session_state.ejecutivo_nom, cliente_actual, 
+                                rfc_f, metodo_p, uso_cfdi, p_final_str, 
+                                origen_ent, metodo_ent, dir_ent, persona_rec, tel_rec, maps_link,
+                                0, "PEDIDO NUEVO", link_pdf_tecnico, link_pago, link_arr, link_csf
+                            ]
+                            ws_p.append_row(row_maestra)
 
-                                # Actualizar estatus en la hoja PERSONAL del ejecutivo
-                                ws_res_local = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
-                                folios_local = ws_res_local.col_values(1)
-                                if str(folio_actual) in folios_local:
-                                    idx_l = folios_local.index(str(folio_actual)) + 1
-                                    ws_res_local.update_cell(idx_l, 14, "100% Ganada")
+                            # Actualizar estatus en la hoja PERSONAL del ejecutivo
+                            ws_res_local = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
+                            folios_local = ws_res_local.col_values(1)
+                            if str(folio_actual) in folios_local:
+                                idx_l = folios_local.index(str(folio_actual)) + 1
+                                ws_res_local.update_cell(idx_l, 14, "100% Ganada")
 
-                                st.session_state.pedido_exitoso = True
-                                st.session_state.pdf_tecnico_actual = pdf_t_blob
-                                st.balloons()
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Error crítico al procesar pedido: {e}")
+                            st.session_state.pedido_exitoso = True
+                            st.session_state.pdf_tecnico_actual = pdf_t_blob
+                            st.balloons()
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error crítico al procesar pedido: {e}")
 
             if st.session_state.get('pedido_exitoso'):
                 st.success("✅ Pedido enviado centralmente a Operaciones.")
