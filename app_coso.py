@@ -2266,9 +2266,9 @@ else:
             if st.button("VALIDAR Y ENVIAR PEDIDO A OPERACIONES", use_container_width=True, type="primary"):
                 if not rfc_f or not persona_rec or not tel_rec or not file_respaldo:
                     st.error("Campos obligatorios: RFC, Persona que recibe, Teléfono y el Documento de Respaldo (Pago/OC).")
-                    else:
-                        try:
-                            with st.spinner("Procesando Pedido Central..."):
+                else:
+                    try:
+                        with st.spinner("Procesando Pedido Central..."):
                                 # ... (conexión y cálculos omitidos por brevedad)
                                 gc = conectar_google_sheets()
                                 try: sh_pedidos = gc.open_by_key(ID_SHEET_PEDIDOS)
