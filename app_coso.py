@@ -2200,8 +2200,7 @@ else:
                             ]
                             
                             if not ejecutivos_prov: 
-                                st.caption(f"No hay ejecutivos registrados para {prov_item}.")
-                                contacto_compra = st.text_input(f"Ejecutivo de Ventas ({idx}):", key=f"cont_manual_{idx}", placeholder="Nombre del ejecutivo...")
+                                contacto_compra = st.text_input(f"Ejecutivo de Ventas ({idx}):", key=f"cont_manual_{idx}", placeholder="Escriba el nombre del ejecutivo...")
                             else:
                                 contacto_compra = st.selectbox(f"Ejecutivo de Ventas ({idx}):", ["N/A"] + ejecutivos_prov, key=f"cont_v_{idx}")
                         
