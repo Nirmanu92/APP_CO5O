@@ -2269,20 +2269,30 @@ else:
                 else:
                     try:
                         with st.spinner("Procesando Pedido Central..."):
-                            # ... (conexión y cálculos)
-                            gc = conectar_google_sheets()
-                            try: sh_pedidos = gc.open_by_key(ID_SHEET_PEDIDOS)
-                            except: sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
+                            # --- CÁLCULOS DINÁMICOS PARA EL PEDIDO ---
+                            df_p_final = st.session_state.df_partidas.copy()
+                            db_prov = st.session_state.get('proveedores_db', [])
+                            mapa_iva = {p['PROVEEDOR']: (1.0 if p.get('SUMA_IVA', 'SI') == 'SI' else 1.16) for p in db_prov}
+                            tc = st.session_state.get('tc_val', 1.0)
+                            moneda_cot = st.session_state.get('moneda_val', 'MXN')
+
+                            def conv(precio, moneda_item):
+                                if moneda_cot == "MXN" and moneda_item == "USD": return precio * tc
+                                if moneda_cot == "USD" and moneda_item == "MXN": return precio / tc
+                                return precio
+
+                            # Calcular columnas financieras necesarias
+                            df_p_final["PM_C"] = df_p_final.apply(lambda r: conv(r.get("PM", 0), r.get("Moneda", "MXN")), axis=1)
+                            df_p_final["Envio_P_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Prov", 0), r.get("Moneda", "MXN")), axis=1)
+                            df_p_final["Envio_S_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Sec", 0), r.get("Moneda", "MXN")), axis=1)
+                            divs = df_p_final["Proveedor"].map(mapa_iva).fillna(1.0)
                             
-                            ws_p = sh_pedidos.sheet1
-                            folio_actual = st.session_state.folio_val
+                            df_p_final["Costo (Sub)"] = (df_p_final["PM_C"] / divs) + df_p_final["Envio_P_C"]
+                            df_p_final["Envio Sec"] = df_p_final["Envio_S_C"]
+                            df_p_final["Venta (Sub)"] = (df_p_final["Costo (Sub)"] + df_p_final["Envio Sec"]) * (1 + (df_p_final.get("Util %", 15) / 100))
+                            df_p_final["Venta (IVA)"] = df_p_final["Venta (Sub)"] * 1.16
                             
-                            # Subir archivos nuevos
-                            link_pago = subir_archivo_a_drive(file_respaldo.read(), f"RESPALDO_{folio_actual}_{file_respaldo.name}", file_respaldo.type) if file_respaldo else ""
-                            link_csf = subir_archivo_a_drive(file_csf.read(), f"CSF_{folio_actual}.pdf", 'application/pdf') if file_csf else ""
-                            link_arr = ""
-                            if pago_cliente == "Financiamiento" and 'file_arrendamiento' in locals() and file_arrendamiento:
-                                link_arr = subir_archivo_a_drive(file_arrendamiento.read(), f"ARR_{folio_actual}_{file_arrendamiento.name}", file_arrendamiento.type)
+                            monto_total = (df_p_final["Venta (IVA)"] * df_p_final["Pzas"]).sum()
 
                             # Preparar datos para el PDF
                             p_final_str = f"{pago_cliente} ({dias_credito if pago_cliente == 'Linea de crédito' else vigencia_fin})"
@@ -2300,7 +2310,7 @@ else:
                                     "moneda": st.session_state.get('moneda_val', 'MXN'),
                                     "tc": st.session_state.get('tc_val', 1.0)
                                 },
-                                st.session_state.df_partidas,
+                                df_p_final,
                                 {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p},
                                 {
                                     "dir_entrega": dir_ent, "persona_recibe": persona_rec, 
