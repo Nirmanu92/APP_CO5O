@@ -2164,7 +2164,49 @@ else:
 
                 st.divider()
 
-                # --- SECCIÓN 3: PAGO Y DOCUMENTACIÓN ---
+                # --- SECCIÓN 3: SOLICITUD DE PEDIDO (POR PRODUCTO) ---
+                st.markdown("### 🛒 Solicitud de Pedido (Detalle de Compra)")
+                st.caption("Especifica cómo debe Operaciones solicitar cada producto.")
+                
+                detalles_compra = {}
+                db_prov_full = st.session_state.get('proveedores_db', [])
+                
+                for idx, row in df_p_actual.iterrows():
+                    prov_item = row.get("Proveedor", "N/A")
+                    concepto_item = row.get("Concepto", "N/A")
+                    link_orig = row.get("Link", "")
+                    
+                    with st.expander(f"📦 Producto: {concepto_item} (Proveedor: {prov_item})", expanded=True):
+                        c_ped1, c_ped2 = st.columns(2)
+                        with c_ped1:
+                            modo_ingreso = st.selectbox(f"Modo de ingreso ({idx}):", ["Plataforma Web", "Ejecutivo de ventas"], key=f"modo_{idx}")
+                        
+                        with c_ped2:
+                            if modo_ingreso == "Plataforma Web":
+                                link_compra = st.text_input(f"Link de producto ({idx}):", value=link_orig, key=f"link_c_{idx}")
+                                contacto_compra = "N/A (Web)"
+                            else:
+                                # Filtrar ejecutivos de ventas para este proveedor específico
+                                # Columna F (PROVEEDOR), Columna I (PUESTO), Columna A (NOMBRE)
+                                ejecutivos_prov = [
+                                    p.get("NOMBRE", "Sin Nombre") for p in db_prov_full 
+                                    if str(p.get("PROVEEDOR", "")).upper() == str(prov_item).upper() 
+                                    and "EJECUTIVO" in str(p.get("PUESTO", "")).upper()
+                                ]
+                                if not ejecutivos_prov: ejecutivos_prov = ["No se encontraron ejecutivos para este proveedor"]
+                                
+                                contacto_compra = st.selectbox(f"Seleccionar Ejecutivo ({idx}):", ejecutivos_prov, key=f"cont_v_{idx}")
+                                link_compra = "N/A (Ejecutivo)"
+                        
+                        detalles_compra[idx] = {
+                            "modo": modo_ingreso,
+                            "contacto": contacto_compra,
+                            "link": link_compra
+                        }
+
+                st.divider()
+
+                # --- SECCIÓN 4: PAGO Y DOCUMENTACIÓN ---
                 st.markdown("### 💰 Pago y Documentación")
                 p1, p2 = st.columns(2)
                 with p1:
