@@ -2164,19 +2164,28 @@ else:
 
                 st.divider()
 
-                # --- SECCIÓN 3: ANEXOS (DOCUMENTACIÓN) ---
-                st.markdown("### 📎 Anexos del Pedido")
+                # --- SECCIÓN 3: PAGO Y DOCUMENTACIÓN ---
+                st.markdown("### 💰 Pago y Documentación")
+                p1, p2 = st.columns(2)
+                with p1:
+                    modo_respaldo = st.radio("Modo de respaldo del pedido:", ["Comprobante de pago", "Orden de compra (OC)"], horizontal=True)
+                
+                if modo_respaldo == "Orden de compra (OC)":
+                    st.warning("⚠️ **AVISO:** Recuerda que todo modo de pago que no sea Anticipado debe estar autorizado por Dirección o Finanzas.")
+                
                 st.caption("Sube los documentos necesarios para procesar el pedido.")
-                a1, a2, a3 = st.columns(3)
-                with a1: file_pago = st.file_uploader("Comprobante de Pago", type=["pdf", "jpg", "png", "zip"])
-                with a2: file_po = st.file_uploader("Orden de Compra (PO)", type=["pdf", "jpg", "png"])
-                with a3: file_csf = st.file_uploader("Constancia Fiscal (CSF)", type=["pdf"])
+                a1, a2 = st.columns(2)
+                with a1: 
+                    label_file = "Cargar Comprobante de Pago" if modo_respaldo == "Comprobante de pago" else "Cargar Orden de Compra (OC)"
+                    file_respaldo = st.file_uploader(label_file, type=["pdf", "jpg", "png", "zip"])
+                with a2: 
+                    file_csf = st.file_uploader("Constancia Fiscal (CSF) - Obligatorio", type=["pdf"])
 
                 st.divider()
                 
                 if st.form_submit_button("VALIDAR Y ENVIAR PEDIDO A OPERACIONES", use_container_width=True, type="primary"):
-                    if not rfc_f or not persona_rec or not tel_rec:
-                        st.error("Campos obligatorios: RFC, Persona que recibe y Teléfono.")
+                    if not rfc_f or not persona_rec or not tel_rec or not file_respaldo:
+                        st.error("Campos obligatorios: RFC, Persona que recibe, Teléfono y el Documento de Respaldo (Pago/OC).")
                     else:
                         try:
                             with st.spinner("Procesando Pedido Central..."):
