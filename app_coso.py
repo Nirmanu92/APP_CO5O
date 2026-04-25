@@ -2301,6 +2301,13 @@ else:
                             
                             monto_total = (df_p_final["Venta (IVA)"] * df_p_final["Pzas"]).sum()
 
+                            # Subir archivos maestros
+                            link_pago = subir_archivo_a_drive(file_respaldo.read(), f"RESPALDO_{folio_actual}_{file_respaldo.name}", file_respaldo.type) if file_respaldo else ""
+                            link_csf = subir_archivo_a_drive(file_csf.read(), f"CSF_{folio_actual}.pdf", 'application/pdf') if file_csf else ""
+                            link_arr = ""
+                            if pago_cliente == "Financiamiento" and 'file_arrendamiento' in locals() and file_arrendamiento:
+                                link_arr = subir_archivo_a_drive(file_arrendamiento.read(), f"ARR_{folio_actual}_{file_arrendamiento.name}", file_arrendamiento.type)
+
                             # Preparar datos para el PDF
                             p_final_str = f"{pago_cliente} ({dias_credito if pago_cliente == 'Linea de crédito' else vigencia_fin})"
                             
