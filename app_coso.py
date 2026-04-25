@@ -2399,16 +2399,6 @@ else:
                                     
                             except Exception as e_local:
                                 st.warning(f"Pedido enviado a Operaciones, pero no se pudo duplicar en tu hoja personal: {e_local}")
-                                    ws_pedidos_local = st.session_state.sh_personal.worksheet("PEDIDOS")
-                                except:
-                                    ws_pedidos_local = st.session_state.sh_personal.add_worksheet(title="PEDIDOS", rows="100", cols="20")
-                                    headers_ped = ["FECHA", "FOLIO", "CLIENTE", "MONTO", "ESTATUS", "PDF_TECNICO", "MAPS"]
-                                    ws_pedidos_local.append_row(headers_ped)
-
-                                row_local = [str(date.today()), folio_actual, cliente_actual, monto_total, "En espera de Visto Bueno", link_pdf_tecnico, maps_link]
-                                ws_pedidos_local.append_row(row_local)
-                            except Exception as e_local:
-                                st.warning(f"Pedido enviado a Operaciones, pero no se pudo duplicar en tu hoja personal: {e_local}")
 
                             # Actualizar estatus
                             ws_res_local = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
