@@ -2312,14 +2312,29 @@ else:
                             )
                             link_pdf_tecnico = subir_archivo_a_drive(pdf_t_blob, f"PEDIDO_TECNICO_{folio_actual}.pdf")
 
-                            # Registro en Sheet Central (Aumentar columnas para capturar los nuevos datos)
+                            # Registro en Sheet Central
                             row_maestra = [
                                 str(date.today()), folio_actual, st.session_state.ejecutivo_nom, cliente_actual, 
                                 rfc_f, metodo_p, uso_cfdi, p_final_str, 
                                 origen_ent, metodo_ent, dir_ent, persona_rec, tel_rec, maps_link,
-                                0, "PEDIDO NUEVO", link_pdf_tecnico, link_pago, link_arr, link_csf
+                                monto_total, "PEDIDO NUEVO", link_pdf_tecnico, link_pago, link_arr, link_csf
                             ]
                             ws_p.append_row(row_maestra)
+
+                            # --- NUEVO: REGISTRO EN HOJA PERSONAL DEL EJECUTIVO (Pestaña PEDIDOS) ---
+                            try:
+                                try:
+                                    ws_pedidos_local = st.session_state.sh_personal.worksheet("PEDIDOS")
+                                except:
+                                    # Si no existe, crearla con encabezados básicos
+                                    ws_pedidos_local = st.session_state.sh_personal.add_worksheet(title="PEDIDOS", rows="100", cols="20")
+                                    headers_ped = ["FECHA", "FOLIO", "CLIENTE", "MONTO", "ESTATUS", "PDF_TECNICO", "MAPS"]
+                                    ws_pedidos_local.append_row(headers_ped)
+
+                                row_local = [str(date.today()), folio_actual, cliente_actual, monto_total, "En espera de Visto Bueno", link_pdf_tecnico, maps_link]
+                                ws_pedidos_local.append_row(row_local)
+                            except Exception as e_local:
+                                st.warning(f"Pedido enviado a Operaciones, pero no se pudo duplicar en tu hoja personal: {e_local}")
 
                             # Actualizar estatus en la hoja PERSONAL del ejecutivo
                             ws_res_local = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
@@ -2332,13 +2347,13 @@ else:
                             st.session_state.pdf_tecnico_actual = pdf_t_blob
                             st.balloons()
                             st.rerun()
-                    except Exception as e:
-                        st.error(f"Error crítico al procesar pedido: {e}")
+                            except Exception as e:
+                            st.error(f"Error crítico al procesar pedido: {e}")
 
-            if st.session_state.get('pedido_exitoso'):
-                st.success("✅ Pedido enviado centralmente a Operaciones.")
-                st.download_button("Descargar Copia de Pedido Técnico", data=st.session_state.pdf_tecnico_actual, file_name=f"PEDIDO_{st.session_state.folio_val}.pdf", use_container_width=True)
-                if st.button("Volver al Dashboard"):
+                            if st.session_state.get('pedido_exitoso'):
+                            st.success("✅ Pedido enviado centralmente a Operaciones.")
+                            st.info("🕒 **Estatus:** En espera de Visto Bueno")
+                            st.download_button("Descargar Copia de Pedido Técnico", data=st.session_state.pdf_tecnico_actual, file_name=f"PEDIDO_{st.session_state.folio_val}.pdf", use_container_width=True)                if st.button("Volver al Dashboard"):
                     del st.session_state['pedido_exitoso']
                     st.session_state.menu_actual = 'menu'
                     st.rerun()
