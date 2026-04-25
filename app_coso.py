@@ -914,7 +914,7 @@ def generar_remision_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
         return resultado.encode('latin-1')
     return bytes(resultado)
 
-def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, datos_oper):
+def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, datos_oper, detalles_compra={}):
     """Genera el PDF técnico avanzado para administración con los 3 rubros detallados, incluyendo precios de venta y comentarios."""
     pdf = PDF(format="letter", tipo_pdf='PEDIDO')
     pdf.set_auto_page_break(auto=True, margin=30)
@@ -942,8 +942,8 @@ def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, dato
     # --- BLOQUE 1: DATOS DE FACTURACIÓN Y LOGÍSTICA ---
     y_bloques = pdf.get_y()
     pdf.set_fill_color(*gris_suave)
-    pdf.rect(15, y_bloques, 90, 38, "F") # Facturación
-    pdf.rect(110, y_bloques, 90, 38, "F") # Logística
+    pdf.rect(15, y_bloques, 90, 42, "F") # Facturación
+    pdf.rect(110, y_bloques, 90, 42, "F") # Logística
     
     # Facturación
     pdf.set_xy(18, y_bloques + 3)
@@ -963,9 +963,9 @@ def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, dato
     pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(*gris_texto)
     pdf.set_xy(113, y_bloques + 8)
-    pdf.multi_cell(80, 4, f"Origen: {limpiar_texto(datos_log.get('origen', 'N/A'))}\nMétodo: {limpiar_texto(datos_log.get('metodo', 'N/A'))}\nDirección: {limpiar_texto(datos_log['dir_entrega'])}\nRecibe: {limpiar_texto(datos_log['persona_recibe'])}\nTel: {limpiar_texto(datos_log['tel_contacto'])}\nPO: {limpiar_texto(datos_log['num_po'])}")
+    pdf.multi_cell(80, 4, f"Origen: {limpiar_texto(datos_log.get('origen', 'N/A'))}\nMétodo: {limpiar_texto(datos_log.get('metodo', 'N/A'))}\nDirección: {limpiar_texto(datos_log['dir_entrega'])}\nRecibe: {limpiar_texto(datos_log['persona_recibe'])}\nTel: {limpiar_texto(datos_log['tel_contacto'])}\nMaps: {limpiar_texto(datos_log.get('maps', 'N/A'))}")
 
-    pdf.ln(5)
+    pdf.ln(8)
     
     # --- BLOQUE 2: DATOS DE PROVEEDOR Y OPERACIÓN ---
     y_oper = pdf.get_y() + 5
@@ -1009,9 +1009,16 @@ def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, dato
     pdf.set_text_color(*gris_texto)
     for i, (idx, row) in enumerate(df_partidas.iterrows()):
         pdf.set_font("helvetica", "", 7)
-        desc_limpia = f"{limpiar_texto(row['Concepto'])}\n{limpiar_texto(row['Descripción'])}"
+        
+        # Info de compra específica de este producto
+        det_c = detalles_compra.get(idx, {})
+        modo = det_c.get("modo", "N/A")
+        referencia = det_c.get("link") if modo == "Plataforma Web" else det_c.get("contacto", "N/A")
+        
+        desc_limpia = f"{limpiar_texto(row['Concepto'])}\n{limpiar_texto(row['Descripción'])}\n> COMPRA: {modo} | {referencia}"
+        
         lineas = len(pdf.multi_cell(w_desc - 4, 3.5, desc_limpia, split_only=True))
-        h_fila = max((lineas * 3.5) + 4, 10)
+        h_fila = max((lineas * 3.5) + 4, 12)
 
         if pdf.get_y() + h_fila > 240:
             pdf.add_page()
@@ -2176,8 +2183,10 @@ else:
                     concepto_item = row.get("Concepto", "N/A")
                     link_orig = row.get("Link", "")
                     
-                    with st.expander(f"📦 Producto: {concepto_item} (Proveedor: {prov_item})", expanded=True):
-                        c_ped1, c_ped2 = st.columns(2)
+                    with st.expander(f"📦 Producto: {concepto_item}", expanded=True):
+                        c_ped0, c_ped1, c_ped2 = st.columns([1, 1.5, 2])
+                        with c_ped0:
+                            st.text_input(f"Proveedor ({idx}):", value=prov_item, disabled=True, key=f"prov_disp_{idx}")
                         with c_ped1:
                             modo_ingreso = st.selectbox(f"Modo de ingreso ({idx}):", ["Plataforma Web", "Ejecutivo de ventas"], key=f"modo_{idx}")
                         
@@ -2187,15 +2196,16 @@ else:
                                 contacto_compra = "N/A (Web)"
                             else:
                                 # Filtrar ejecutivos de ventas para este proveedor específico
-                                # Columna F (PROVEEDOR), Columna I (PUESTO), Columna A (NOMBRE)
                                 ejecutivos_prov = [
                                     p.get("NOMBRE", "Sin Nombre") for p in db_prov_full 
                                     if str(p.get("PROVEEDOR", "")).upper() == str(prov_item).upper() 
                                     and "EJECUTIVO" in str(p.get("PUESTO", "")).upper()
                                 ]
-                                if not ejecutivos_prov: ejecutivos_prov = ["No se encontraron ejecutivos para este proveedor"]
-                                
-                                contacto_compra = st.selectbox(f"Seleccionar Ejecutivo ({idx}):", ejecutivos_prov, key=f"cont_v_{idx}")
+                                if not ejecutivos_prov: 
+                                    st.info(f"No hay ejecutivos registrados para {prov_item}. Se habilitó escritura manual.")
+                                    contacto_compra = st.text_input(f"Nombre del Ejecutivo ({idx}):", key=f"cont_manual_{idx}")
+                                else:
+                                    contacto_compra = st.selectbox(f"Seleccionar Ejecutivo ({idx}):", ejecutivos_prov, key=f"cont_v_{idx}")
                                 link_compra = "N/A (Ejecutivo)"
                         
                         detalles_compra[idx] = {
@@ -2234,20 +2244,18 @@ else:
                                 gc = conectar_google_sheets()
                                 # CONEXIÓN CENTRAL
                                 try:
-                                    # Intentar por ID (más seguro)
                                     sh_pedidos = gc.open_by_key(ID_SHEET_PEDIDOS)
                                 except:
                                     try:
-                                        # Fallback por nombre
                                         sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
                                     except:
-                                        st.error("No se pudo abrir el archivo central de pedidos. Revisa el ID y los permisos para 'app-coso@manuel-hernandez.iam.gserviceaccount.com'")
+                                        st.error("No se pudo abrir el archivo central de pedidos.")
                                         st.stop()
                                 
                                 ws_p = sh_pedidos.sheet1
                                 folio_actual = st.session_state.folio_val
                                 
-                                # --- ASEGURAR COLUMNAS DE CÁLCULO PARA EL PDF TÉCNICO ---
+                                # ... (lógica de cálculo omitida para brevedad, se mantiene igual)
                                 df_p_final = df_p_actual.copy()
                                 db_prov = st.session_state.get('proveedores_db', [])
                                 mapa_iva = {p['PROVEEDOR']: (1.0 if p.get('SUMA_IVA', 'SI') == 'SI' else 1.16) for p in db_prov}
@@ -2259,31 +2267,25 @@ else:
                                     if moneda_cot == "USD" and moneda_item == "MXN": return precio / tc
                                     return precio
 
-                                # Inyectar cálculos si no existen (viniendo del editor)
                                 if "Costo (Sub)" not in df_p_final.columns:
                                     df_p_final["PM_C"] = df_p_final.apply(lambda r: conv(r.get("PM", 0), r.get("Moneda", "MXN")), axis=1)
                                     df_p_final["Envio_P_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Prov", 0), r.get("Moneda", "MXN")), axis=1)
                                     df_p_final["Envio_S_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Sec", 0), r.get("Moneda", "MXN")), axis=1)
                                     divs = df_p_final["Proveedor"].map(mapa_iva).fillna(1.0)
-                                    
                                     df_p_final["Costo (Sub)"] = (df_p_final["PM_C"] / divs) + df_p_final["Envio_P_C"]
                                     df_p_final["Envio Sec"] = df_p_final["Envio_S_C"]
                                     df_p_final["Venta (Sub)"] = (df_p_final["Costo (Sub)"] + df_p_final["Envio Sec"]) * (1 + (df_p_final.get("Util %", 15) / 100))
                                     df_p_final["Venta (IVA)"] = df_p_final["Venta (Sub)"] * 1.16
 
-                                # Subir archivos a Drive
-                                link_pago = subir_archivo_a_drive(file_pago.read(), f"PAGO_{folio_actual}_{file_pago.name}", file_pago.type) if file_pago else ""
-                                link_po = subir_archivo_a_drive(file_po.read(), f"PO_{folio_actual}_{file_po.name}", file_po.type) if file_po else ""
+                                # Subir archivos
+                                link_pago = subir_archivo_a_drive(file_respaldo.read(), f"RESPALDO_{folio_actual}_{file_respaldo.name}", file_respaldo.type) if file_respaldo else ""
                                 link_csf = subir_archivo_a_drive(file_csf.read(), f"CSF_{folio_actual}.pdf", 'application/pdf') if file_csf else ""
 
-                                # Preparar PDF de Remisión y Pedido Técnico para el registro central
+                                # PASAR DETALLES_COMPRA AL PDF
                                 pdf_t_blob = generar_pedido_tecnico_blob_v2(
                                     {
-                                        "folio": folio_actual, 
-                                        "ejecutivo": st.session_state.ejecutivo_nom, 
-                                        "cliente": cliente_actual, 
-                                        "prioridad": "Normal", 
-                                        "arrendamiento": "No",
+                                        "folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, 
+                                        "cliente": cliente_actual, "prioridad": "Normal", "arrendamiento": "No",
                                         "comentarios": st.session_state.get('coment_val', ''),
                                         "entrega": st.session_state.get('entrega_val', ''),
                                         "pago": st.session_state.get('pago_val', ''),
@@ -2294,26 +2296,21 @@ else:
                                     df_p_final, 
                                     {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p},
                                     {
-                                        "dir_entrega": dir_ent, 
-                                        "persona_recibe": persona_rec, 
-                                        "tel_contacto": tel_rec, 
-                                        "maps": maps_link,
-                                        "origen": origen_ent,
-                                        "metodo": metodo_ent
+                                        "dir_entrega": dir_ent, "persona_recibe": persona_rec, 
+                                        "tel_contacto": tel_rec, "maps": maps_link,
+                                        "origen": origen_ent, "metodo": metodo_ent
                                     },
-                                    {"vendedor": "", "pm": "", "vigencia_prov": "", "registro_op": "", "folio_prov": ""}
+                                    {"vendedor": "", "pm": "", "vigencia_prov": "", "registro_op": "", "folio_prov": ""},
+                                    detalles_compra=detalles_compra
                                 )
                                 link_pdf_tecnico = subir_archivo_a_drive(pdf_t_blob, f"PEDIDO_TECNICO_{folio_actual}.pdf")
 
-                                # FILA MAESTRA (Ajustar a las columnas de tu sheet PEDIDOS_Y_FACTURAS)
-                                # Formato sugerido: Fecha, Folio, Ejecutivo, Cliente, RFC, Monto, Estatus, Origen, Metodo, Links...
                                 monto_total = (df_p_final["Venta (IVA)"] * df_p_final["Pzas"]).sum()
-                                
                                 row_maestra = [
                                     str(date.today()), folio_actual, st.session_state.ejecutivo_nom, cliente_actual, 
                                     rfc_f, metodo_p, uso_cfdi, condiciones_pago, 
                                     origen_ent, metodo_ent, dir_ent, persona_rec, tel_rec, maps_link,
-                                    monto_total, "PEDIDO NUEVO", link_pdf_tecnico, link_pago, link_po, link_csf
+                                    monto_total, "PEDIDO NUEVO", link_pdf_tecnico, link_pago, "", link_csf
                                 ]
                                 ws_p.append_row(row_maestra)
 
