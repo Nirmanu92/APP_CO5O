@@ -2122,145 +2122,148 @@ else:
             rfc_sugerido = info_fiscal.get('RFC', '')
             credito_info = info_fiscal.get('CREDITO', 'Sin crédito')
 
-            with st.form("form_pedido_pro"):
-                # --- SECCIÓN 1: DATOS FISCALES Y FACTURACIÓN ---
-                st.markdown("### 📄 Datos Fiscales y Facturación")
-                f1, f2 = st.columns(2)
-                with f1:
-                    razon_f = st.text_input("Razón Social Fiscal:", value=cliente_actual)
-                    rfc_f = st.text_input("RFC:", value=rfc_sugerido)
-                with f2:
-                    metodos_p = ["PUE - Pago en una sola exhibición", "PPD - Pago en parcialidades o diferido"]
-                    metodo_p = st.selectbox("Método de Pago:", metodos_p)
-                    usos_cfdi = [
-                        "G01 - Adquisición de mercancías",
-                        "G03 - Gastos en general",
-                        "I01 - Construcciones",
-                        "I02 - Mobiliario y equipo de oficina por inversiones",
-                        "I04 - Equipo de cómputo y accesorios",
-                        "I08 - Otra maquinaria y equipo",
-                        "S01 - Sin efectos fiscales",
-                        "CP01 - Pagos",
-                        "CN01 - Nómina",
-                        "D01 - Honorarios médicos, dentales y gastos hospitalarios",
-                        "D02 - Gastos médicos por incapacidad o discapacidad",
-                        "D03 - Gastos funerales",
-                        "D04 - Donativos",
-                        "D10 - Pagos por servicios educativos (colegiaturas)"
-                    ]
-                    uso_cfdi = st.selectbox("Uso de CFDI:", usos_cfdi)
-                
-                # Mover Condiciones de Pago a una variable interna (sin widget en esta sección)
-                condiciones_pago = st.session_state.get('pago_val', '')
+            # 2. Buscar datos fiscales del cliente
+            info_fiscal = next((f for f in st.session_state.get('datos_fiscales', []) if f.get('RAZON_SOCIAL') == cliente_actual or f.get('CLIENTE') == cliente_actual), {})
+            rfc_sugerido = info_fiscal.get('RFC', '')
+            credito_info = info_fiscal.get('CREDITO', 'Sin crédito')
 
-                st.divider()
+            # --- SECCIÓN 1: DATOS FISCALES Y FACTURACIÓN ---
+            st.markdown("### 📄 Datos Fiscales y Facturación")
+            f1, f2 = st.columns(2)
+            with f1:
+                razon_f = st.text_input("Razón Social Fiscal:", value=cliente_actual)
+                rfc_f = st.text_input("RFC:", value=rfc_sugerido)
+            with f2:
+                metodos_p = ["PUE - Pago en una sola exhibición", "PPD - Pago en parcialidades o diferido"]
+                metodo_p = st.selectbox("Método de Pago:", metodos_p)
+                usos_cfdi = [
+                    "G01 - Adquisición de mercancías",
+                    "G03 - Gastos en general",
+                    "I01 - Construcciones",
+                    "I02 - Mobiliario y equipo de oficina por inversiones",
+                    "I04 - Equipo de cómputo y accesorios",
+                    "I08 - Otra maquinaria y equipo",
+                    "S01 - Sin efectos fiscales",
+                    "CP01 - Pagos",
+                    "CN01 - Nómina",
+                    "D01 - Honorarios médicos, dentales y gastos hospitalarios",
+                    "D02 - Gastos médicos por incapacidad o discapacidad",
+                    "D03 - Gastos funerales",
+                    "D04 - Donativos",
+                    "D10 - Pagos por servicios educativos (colegiaturas)"
+                ]
+                uso_cfdi = st.selectbox("Uso de CFDI:", usos_cfdi)
 
-                # --- SECCIÓN 2: LOGÍSTICA DETALLADA ---
-                st.markdown("### 🚚 Logística y Entrega")
-                l1, l2 = st.columns(2)
-                with l1:
-                    origen_ent = st.radio("Origen de entrega:", ["Directo proveedor", "Directo de oficina"], horizontal=True)
-                    metodo_ent = st.radio("Método:", ["Paquetería", "Ruta interna", "recolección de cliente"], horizontal=True)
-                with l2:
-                    dir_ent = st.text_area("Dirección completa a entregar:", value=st.session_state.get('entrega_val', ''))
-                
-                lc1, lc2, lc3 = st.columns(3)
-                with lc1: persona_rec = st.text_input("Persona que recibe:")
-                with lc2: tel_rec = st.text_input("Teléfono de quien recibe:")
-                with lc3: maps_link = st.text_input("Link de ubicación Maps:")
+            # Mover Condiciones de Pago a una variable interna (sin widget en esta sección)
+            condiciones_pago = st.session_state.get('pago_val', '')
 
-                st.divider()
+            st.divider()
 
-                # --- SECCIÓN 3: SOLICITUD DE PEDIDO (POR PRODUCTO) ---
-                st.markdown("### 🛒 Solicitud de Pedido (Detalle de Compra)")
-                st.caption("Especifique los datos de compra para cada producto.")
-                
-                detalles_compra = {}
-                db_prov_full = st.session_state.get('proveedores_db', [])
-                
-                for idx, row in df_p_actual.iterrows():
-                    prov_item = row.get("Proveedor", "N/A")
-                    concepto_item = row.get("Concepto", "N/A")
-                    link_orig = row.get("Link", "")
-                    
-                    with st.expander(f"📦 Producto: {concepto_item}", expanded=True):
-                        c_ped0, c_ped1, c_ped2 = st.columns([1, 1.5, 1.5])
-                        with c_ped0:
-                            st.text_input(f"Proveedor ({idx}):", value=prov_item, disabled=True, key=f"prov_disp_{idx}")
-                        
-                        with c_ped1:
-                            link_compra = st.text_input(f"Link de producto ({idx}):", value=link_orig, key=f"link_c_{idx}")
-                        
-                        with c_ped2:
-                            # Filtrar ejecutivos de ventas para este proveedor específico
-                            ejecutivos_prov = [
-                                p.get("NOMBRE", "Sin Nombre") for p in db_prov_full 
-                                if str(p.get("PROVEEDOR", "")).upper() == str(prov_item).upper() 
-                                and "EJECUTIVO" in str(p.get("PUESTO", "")).upper()
-                            ]
-                            
-                            if not ejecutivos_prov: 
-                                contacto_compra = st.text_input(f"Ejecutivo de Ventas ({idx}):", key=f"cont_manual_{idx}", placeholder="Escriba el nombre del ejecutivo...")
-                            else:
-                                contacto_compra = st.selectbox(f"Ejecutivo de Ventas ({idx}):", ["N/A"] + ejecutivos_prov, key=f"cont_v_{idx}")
-                        
-                        detalles_compra[idx] = {
-                            "link": link_compra if link_compra else "N/A",
-                            "contacto": contacto_compra if contacto_compra else "N/A"
-                        }
+            # --- SECCIÓN 2: LOGÍSTICA DETALLADA ---
+            st.markdown("### 🚚 Logística y Entrega")
+            l1, l2 = st.columns(2)
+            with l1:
+                origen_ent = st.radio("Origen de entrega:", ["Directo proveedor", "Directo de oficina"], horizontal=True)
+                metodo_ent = st.radio("Método:", ["Paquetería", "Ruta interna", "recolección de cliente"], horizontal=True)
+            with l2:
+                dir_ent = st.text_area("Dirección completa a entregar:", value=st.session_state.get('entrega_val', ''))
 
-                st.divider()
+            lc1, lc2, lc3 = st.columns(3)
+            with lc1: persona_rec = st.text_input("Persona que recibe:")
+            with lc2: tel_rec = st.text_input("Teléfono de quien recibe:")
+            with lc3: maps_link = st.text_input("Link de ubicación Maps:")
 
-                # --- SECCIÓN 4: PAGO Y DOCUMENTACIÓN ---
-                st.markdown("### 💰 Pago y Documentación")
-                
-                # Fila 1: Modo de Respaldo y Pago de Cliente
-                p1, p2 = st.columns(2)
-                with p1:
-                    modo_respaldo = st.radio("Modo de respaldo del pedido:", ["Comprobante de pago", "Orden de compra (OC)"], horizontal=True)
-                    if modo_respaldo == "Orden de compra (OC)":
-                        st.warning("⚠️ **AVISO:** Recuerda que todo modo de pago que no sea Anticipado debe estar autorizado.")
-                
-                with p2:
-                    pago_cliente = st.selectbox("Pago de cliente:", ["Anticipado", "Linea de crédito", "Financiamiento", "Otro modo"])
+            st.divider()
 
-                # Fila 2: Condiciones específicas (Crédito o Financiamiento)
-                pc1, pc2 = st.columns(2)
-                
-                # Lógica para Línea de Crédito
-                if pago_cliente == "Linea de crédito":
-                    with pc1:
-                        opciones_credito = ["7 Días", "10 Días", "15 Días", "30 Días", "15 Días + 50% anticipo", "30 Días + 50% anticipo"]
-                        dias_credito = st.selectbox("Opciones de crédito:", opciones_credito)
-                        vigencia_fin = "N/A"
-                        financiera_fin = "N/A"
-                
-                # Lógica para Financiamiento
-                elif pago_cliente == "Financiamiento":
-                    with pc1:
-                        financiera_fin = st.selectbox("Financiera:", ["DFS", "HPE", "CSI Leasing", "CHG Meridian", "Otro"])
-                        vigencia_fin = st.selectbox("Vigencia (Años):", ["2 años", "3 años", "4 años", "5 años"])
-                    with pc2:
-                        file_arrendamiento = st.file_uploader("Cargar propuesta de arrendamiento", type=["pdf", "jpg", "png"])
-                        dias_credito = "N/A"
-                else:
-                    dias_credito = "N/A"
+            # --- SECCIÓN 3: SOLICITUD DE PEDIDO (POR PRODUCTO) ---
+            st.markdown("### 🛒 Solicitud de Pedido (Detalle de Compra)")
+            st.caption("Especifique los datos de compra para cada producto.")
+
+            detalles_compra = {}
+            db_prov_full = st.session_state.get('proveedores_db', [])
+
+            for idx, row in df_p_actual.iterrows():
+                prov_item = row.get("Proveedor", "N/A")
+                concepto_item = row.get("Concepto", "N/A")
+                link_orig = row.get("Link", "")
+
+                with st.expander(f"📦 Producto: {concepto_item}", expanded=True):
+                    c_ped0, c_ped1, c_ped2 = st.columns([1, 1.5, 1.5])
+                    with c_ped0:
+                        st.text_input(f"Proveedor ({idx}):", value=prov_item, disabled=True, key=f"prov_disp_{idx}")
+
+                    with c_ped1:
+                        link_compra = st.text_input(f"Link de producto ({idx}):", value=link_orig, key=f"link_c_{idx}")
+
+                    with c_ped2:
+                        # Filtrar ejecutivos de ventas para este proveedor específico
+                        ejecutivos_prov = [
+                            p.get("NOMBRE", "Sin Nombre") for p in db_prov_full 
+                            if str(p.get("PROVEEDOR", "")).upper() == str(prov_item).upper() 
+                            and "EJECUTIVO" in str(p.get("PUESTO", "")).upper()
+                        ]
+
+                        if not ejecutivos_prov: 
+                            contacto_compra = st.text_input(f"Ejecutivo de Ventas ({idx}):", key=f"cont_manual_{idx}", placeholder="Escriba el nombre del ejecutivo...")
+                        else:
+                            contacto_compra = st.selectbox(f"Ejecutivo de Ventas ({idx}):", ["N/A"] + ejecutivos_prov, key=f"cont_v_{idx}")
+
+                    detalles_compra[idx] = {
+                        "link": link_compra if link_compra else "N/A",
+                        "contacto": contacto_compra if contacto_compra else "N/A"
+                    }
+
+            st.divider()
+
+            # --- SECCIÓN 4: PAGO Y DOCUMENTACIÓN ---
+            st.markdown("### 💰 Pago y Documentación")
+
+            # Fila 1: Modo de Respaldo y Pago de Cliente
+            p1, p2 = st.columns(2)
+            with p1:
+                modo_respaldo = st.radio("Modo de respaldo del pedido:", ["Comprobante de pago", "Orden de compra (OC)"], horizontal=True)
+                if modo_respaldo == "Orden de compra (OC)":
+                    st.warning("⚠️ **AVISO:** Recuerda que todo modo de pago que no sea Anticipado debe estar autorizado.")
+
+            with p2:
+                pago_cliente = st.selectbox("Pago de cliente:", ["Anticipado", "Linea de crédito", "Financiamiento", "Otro modo"])
+
+            # Fila 2: Condiciones específicas (Crédito o Financiamiento)
+            pc1, pc2 = st.columns(2)
+
+            # Lógica para Línea de Crédito
+            if pago_cliente == "Linea de crédito":
+                with pc1:
+                    opciones_credito = ["7 Días", "10 Días", "15 Días", "30 Días", "15 Días + 50% anticipo", "30 Días + 50% anticipo"]
+                    dias_credito = st.selectbox("Opciones de crédito:", opciones_credito)
                     vigencia_fin = "N/A"
                     financiera_fin = "N/A"
 
-                st.divider()
-                st.caption("Sube los documentos maestros para procesar el pedido.")
-                a1, a2 = st.columns(2)
-                with a1: 
-                    label_file = "Cargar Comprobante de Pago" if modo_respaldo == "Comprobante de pago" else "Cargar Orden de Compra (OC)"
-                    file_respaldo = st.file_uploader(label_file, type=["pdf", "jpg", "png", "zip"])
-                with a2: 
-                    file_csf = st.file_uploader("Constancia Fiscal (CSF) - Obligatorio", type=["pdf"])
+            # Lógica para Financiamiento
+            elif pago_cliente == "Financiamiento":
+                with pc1:
+                    financiera_fin = st.selectbox("Financiera:", ["DFS", "HPE", "CSI Leasing", "CHG Meridian", "Otro"])
+                    vigencia_fin = st.selectbox("Vigencia (Años):", ["2 años", "3 años", "4 años", "5 años"])
+                with pc2:
+                    file_arrendamiento = st.file_uploader("Cargar propuesta de arrendamiento", type=["pdf", "jpg", "png"])
+                    dias_credito = "N/A"
+            else:
+                dias_credito = "N/A"
+                vigencia_fin = "N/A"
+                financiera_fin = "N/A"
 
-                st.divider()
-                
-                if st.form_submit_button("VALIDAR Y ENVIAR PEDIDO A OPERACIONES", use_container_width=True, type="primary"):
-                    if not rfc_f or not persona_rec or not tel_rec or not file_respaldo:
+            st.divider()
+            st.caption("Sube los documentos maestros para procesar el pedido.")
+            a1, a2 = st.columns(2)
+            with a1: 
+                label_file = "Cargar Comprobante de Pago" if modo_respaldo == "Comprobante de pago" else "Cargar Orden de Compra (OC)"
+                file_respaldo = st.file_uploader(label_file, type=["pdf", "jpg", "png", "zip"])
+            with a2: 
+                file_csf = st.file_uploader("Constancia Fiscal (CSF) - Obligatorio", type=["pdf"])
+
+            st.divider()
+
+            if st.button("VALIDAR Y ENVIAR PEDIDO A OPERACIONES", use_container_width=True, type="primary"):                    if not rfc_f or not persona_rec or not tel_rec or not file_respaldo:
                         st.error("Campos obligatorios: RFC, Persona que recibe, Teléfono y el Documento de Respaldo (Pago/OC).")
                     else:
                         try:
