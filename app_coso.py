@@ -1012,10 +1012,10 @@ def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, dato
         
         # Info de compra específica de este producto
         det_c = detalles_compra.get(idx, {})
-        modo = det_c.get("modo", "N/A")
-        referencia = det_c.get("link") if modo == "Plataforma Web" else det_c.get("contacto", "N/A")
+        link_c = det_c.get("link", "N/A")
+        cont_c = det_c.get("contacto", "N/A")
         
-        desc_limpia = f"{limpiar_texto(row['Concepto'])}\n{limpiar_texto(row['Descripción'])}\n> COMPRA: {modo} | {referencia}"
+        desc_limpia = f"{limpiar_texto(row['Concepto'])}\n{limpiar_texto(row['Descripción'])}\n> LINK: {link_c}\n> EJECUTIVO: {cont_c}"
         
         lineas = len(pdf.multi_cell(w_desc - 4, 3.5, desc_limpia, split_only=True))
         h_fila = max((lineas * 3.5) + 4, 12)
@@ -2173,7 +2173,7 @@ else:
 
                 # --- SECCIÓN 3: SOLICITUD DE PEDIDO (POR PRODUCTO) ---
                 st.markdown("### 🛒 Solicitud de Pedido (Detalle de Compra)")
-                st.caption("Especifica cómo debe Operaciones solicitar cada producto.")
+                st.caption("Especifique los datos de compra para cada producto.")
                 
                 detalles_compra = {}
                 db_prov_full = st.session_state.get('proveedores_db', [])
@@ -2184,34 +2184,30 @@ else:
                     link_orig = row.get("Link", "")
                     
                     with st.expander(f"📦 Producto: {concepto_item}", expanded=True):
-                        c_ped0, c_ped1, c_ped2 = st.columns([1, 1.5, 2])
+                        c_ped0, c_ped1, c_ped2 = st.columns([1, 1.5, 1.5])
                         with c_ped0:
                             st.text_input(f"Proveedor ({idx}):", value=prov_item, disabled=True, key=f"prov_disp_{idx}")
+                        
                         with c_ped1:
-                            modo_ingreso = st.selectbox(f"Modo de ingreso ({idx}):", ["Plataforma Web", "Ejecutivo de ventas"], key=f"modo_{idx}")
+                            link_compra = st.text_input(f"Link de producto ({idx}):", value=link_orig, key=f"link_c_{idx}")
                         
                         with c_ped2:
-                            if modo_ingreso == "Plataforma Web":
-                                link_compra = st.text_input(f"Link de producto ({idx}):", value=link_orig, key=f"link_c_{idx}")
-                                contacto_compra = "N/A (Web)"
+                            # Filtrar ejecutivos de ventas para este proveedor específico
+                            ejecutivos_prov = [
+                                p.get("NOMBRE", "Sin Nombre") for p in db_prov_full 
+                                if str(p.get("PROVEEDOR", "")).upper() == str(prov_item).upper() 
+                                and "EJECUTIVO" in str(p.get("PUESTO", "")).upper()
+                            ]
+                            
+                            if not ejecutivos_prov: 
+                                st.caption(f"No hay ejecutivos registrados para {prov_item}.")
+                                contacto_compra = st.text_input(f"Ejecutivo de Ventas ({idx}):", key=f"cont_manual_{idx}", placeholder="Nombre del ejecutivo...")
                             else:
-                                # Filtrar ejecutivos de ventas para este proveedor específico
-                                ejecutivos_prov = [
-                                    p.get("NOMBRE", "Sin Nombre") for p in db_prov_full 
-                                    if str(p.get("PROVEEDOR", "")).upper() == str(prov_item).upper() 
-                                    and "EJECUTIVO" in str(p.get("PUESTO", "")).upper()
-                                ]
-                                if not ejecutivos_prov: 
-                                    st.info(f"No hay ejecutivos registrados para {prov_item}. Se habilitó escritura manual.")
-                                    contacto_compra = st.text_input(f"Nombre del Ejecutivo ({idx}):", key=f"cont_manual_{idx}")
-                                else:
-                                    contacto_compra = st.selectbox(f"Seleccionar Ejecutivo ({idx}):", ejecutivos_prov, key=f"cont_v_{idx}")
-                                link_compra = "N/A (Ejecutivo)"
+                                contacto_compra = st.selectbox(f"Ejecutivo de Ventas ({idx}):", ["N/A"] + ejecutivos_prov, key=f"cont_v_{idx}")
                         
                         detalles_compra[idx] = {
-                            "modo": modo_ingreso,
-                            "contacto": contacto_compra,
-                            "link": link_compra
+                            "link": link_compra if link_compra else "N/A",
+                            "contacto": contacto_compra if contacto_compra else "N/A"
                         }
 
                 st.divider()
