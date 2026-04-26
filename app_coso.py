@@ -2336,69 +2336,89 @@ else:
                             )
                             link_pdf_tecnico = subir_archivo_a_drive(pdf_t_blob, f"PEDIDO_TECNICO_{folio_actual}.pdf")
 
-                            # Registro en Sheet Central (PEDIDOS_Y_FACTURAS)
-                            # Formato extendido para capturar TODO lo plasmado
+                            # --- VACIADO GRANULAR DE TODA LA INFORMACIÓN ---
+                            # 1. REGISTRO EN SHEET CENTRAL (PEDIDOS_Y_FACTURAS)
+                            # Orden: Fecha, Folio, Ejecutivo, Cliente, RS_Fiscal, RFC, Metodo_Pago, Uso_CFDI, 
+                            #        Pago_Tipo, Detalle_Credito, Detalle_Financiamiento, Financiera,
+                            #        Origen_Ent, Metodo_Envio, Direccion, Recibe, Tel_Recibe, Link_Maps,
+                            #        Monto, Estatus, Comentarios, Link_PDF, Link_Respaldo, Link_CSF, Link_Arr
                             row_maestra = [
                                 str(date.today()),          # A: Fecha
                                 folio_actual,               # B: Folio
                                 st.session_state.ejecutivo_nom, # C: Ejecutivo
-                                cliente_actual,             # D: Cliente
-                                rfc_f,                      # E: RFC
-                                razon_f,                    # F: Razón Social Fiscal
-                                metodo_p,                   # G: Método Pago
+                                cliente_actual,             # D: Cliente (Comercial)
+                                razon_f,                    # E: Razón Social Fiscal
+                                rfc_f,                      # F: RFC
+                                metodo_p,                   # G: Método Pago (PUE/PPD)
                                 uso_cfdi,                   # H: Uso CFDI
-                                p_final_str,                # I: Modo Pago / Crédito
-                                origen_ent,                 # J: Origen Logística
-                                metodo_ent,                 # K: Método Envío
-                                dir_ent,                    # L: Dirección Entrega
-                                persona_rec,                # M: Recibe
-                                tel_rec,                    # N: Teléfono
-                                maps_link,                  # O: Link Maps
-                                monto_total,                # P: Monto Total
-                                "PEDIDO NUEVO",             # Q: Estatus
-                                link_pdf_tecnico,           # R: PDF Técnico
-                                link_pago,                  # S: Comprobante/OC
-                                link_csf,                   # T: Constancia Fiscal
-                                link_arr                    # U: Arrendamiento
+                                pago_cliente,               # I: Tipo Pago (Anticipado/Crédito/etc)
+                                dias_credito,               # J: Días Crédito (si aplica)
+                                vigencia_fin,               # K: Vigencia Financiamiento (si aplica)
+                                financiera_fin,             # L: Financiera
+                                origen_ent,                 # M: Origen Entrega
+                                metodo_ent,                 # N: Método Envío (Paquetería/Ruta/etc)
+                                dir_ent,                    # O: Dirección Completa
+                                persona_rec,                # P: Persona que recibe
+                                tel_rec,                    # Q: Teléfono de contacto
+                                maps_link,                  # R: Link de ubicación Maps
+                                monto_total,                # S: Monto Total IVA Incluido
+                                "PEDIDO NUEVO",             # T: Estatus Central
+                                st.session_state.get('coment_val', ''), # U: Comentarios/Notas
+                                link_pdf_tecnico,           # V: Link PDF Técnico
+                                link_pago,                  # W: Link Comprobante / OC
+                                link_csf,                   # X: Link Constancia Fiscal
+                                link_arr                    # Y: Link Arrendamiento
                             ]
                             ws_p.append_row(row_maestra)
 
-                            # --- REGISTRO EN HOJA PERSONAL DEL EJECUTIVO ---
+                            # --- 2. REGISTRO EN HOJA PERSONAL DEL EJECUTIVO ---
                             try:
                                 try:
                                     ws_pedidos_local = st.session_state.sh_personal.worksheet("PEDIDOS")
                                 except:
-                                    ws_pedidos_local = st.session_state.sh_personal.add_worksheet(title="PEDIDOS", rows="500", cols="25")
-                                    headers_ped = ["FECHA", "FOLIO", "CLIENTE", "RFC", "PAGO_CLIENTE", "ORIGEN", "METODO", "DIRECCION", "RECIBE", "TEL", "MAPS", "MONTO", "ESTATUS", "PDF_TECNICO", "RESPALDO_LINK"]
-                                    ws_pedidos_local.append_row(headers_ped)
-
+                                    # Crear con muchas columnas por si el usuario añade más
+                                    ws_pedidos_local = st.session_state.sh_personal.add_worksheet(title="PEDIDOS", rows="1000", cols="30")
+                                    # Solo ponemos encabezados si es nueva
+                                    ws_pedidos_local.append_row(["FECHA", "FOLIO", "CLIENTE", "RS_FISCAL", "RFC", "PAGO_TIPO", "CREDITO/FINANC", "ORIGEN", "METODO", "DIRECCION", "RECIBE", "TEL", "MAPS", "MONTO", "ESTATUS", "COMENTARIOS", "PDF_TECNICO", "RESPALDO_LINK", "CSF_LINK"])
+                                
+                                # Usamos el mismo orden granular que la maestra para consistencia
                                 row_local = [
-                                    str(date.today()), folio_actual, cliente_actual, rfc_f, p_final_str,
+                                    str(date.today()), folio_actual, cliente_actual, razon_f, rfc_f,
+                                    pago_cliente, f"{dias_credito} / {vigencia_fin}",
                                     origen_ent, metodo_ent, dir_ent, persona_rec, tel_rec,
-                                    maps_link, monto_total, "En espera de Visto Bueno", link_pdf_tecnico, link_pago
+                                    maps_link, monto_total, "En espera de Visto Bueno", 
+                                    st.session_state.get('coment_val', ''),
+                                    link_pdf_tecnico, link_pago, link_csf, link_arr
                                 ]
                                 ws_pedidos_local.append_row(row_local)
                                 
-                                # --- VACIADO DE DETALLES (PARTIDAS) ---
+                                # --- 3. VACIADO DE DETALLES (PARTIDAS) ---
                                 try:
                                     ws_ped_det = st.session_state.sh_personal.worksheet("PEDIDOS_DETALLE")
                                 except:
-                                    ws_ped_det = st.session_state.sh_personal.add_worksheet(title="PEDIDOS_DETALLE", rows="1000", cols="10")
-                                    ws_ped_det.append_row(["FOLIO", "PRODUCTO", "PROVEEDOR", "LINK_COMPRA", "EJECUTIVO_PROV", "CANTIDAD", "PRECIO_U"])
+                                    ws_ped_det = st.session_state.sh_personal.add_worksheet(title="PEDIDOS_DETALLE", rows="2000", cols="15")
+                                    ws_ped_det.append_row(["FOLIO", "PRODUCTO", "PROVEEDOR", "LINK_COMPRA", "EJECUTIVO_PROV", "CANTIDAD", "MONEDA", "PRECIO_U_SIN_IVA", "SUBTOTAL_SIN_IVA", "TOTAL_CON_IVA"])
                                 
                                 filas_detalle_pedido = []
                                 for idx, row in df_p_final.iterrows():
                                     det_c = detalles_compra.get(idx, {})
                                     filas_detalle_pedido.append([
-                                        folio_actual, row['Concepto'], row['Proveedor'], 
-                                        det_c.get('link', 'N/A'), det_c.get('contacto', 'N/A'),
-                                        row['Pzas'], row['Venta (Sub)']
+                                        folio_actual, 
+                                        row['Concepto'], 
+                                        row['Proveedor'], 
+                                        det_c.get('link', 'N/A'), 
+                                        det_c.get('contacto', 'N/A'),
+                                        row['Pzas'],
+                                        row.get('Moneda', 'MXN'),
+                                        row['Venta (Sub)'],
+                                        row['Venta (Sub)'] * row['Pzas'],
+                                        row['Venta (IVA)'] * row['Pzas']
                                     ])
                                 if filas_detalle_pedido:
                                     ws_ped_det.append_rows(filas_detalle_pedido)
                                     
                             except Exception as e_local:
-                                st.warning(f"Pedido enviado a Operaciones, pero no se pudo duplicar en tu hoja personal: {e_local}")
+                                st.warning(f"Pedido enviado, pero hubo un detalle al actualizar tu hoja personal: {e_local}")
 
                             # Actualizar estatus
                             ws_res_local = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
