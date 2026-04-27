@@ -2449,25 +2449,25 @@ elif st.session_state.menu_actual == 'nuevo':
     # Crear las pestañas
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["Generales", "Partidas", "Ilustraciones", "Evidencias", "Finalizar"])
 
-            with tab1:
-                st.subheader("Datos del Emisor y Cliente")
-                col_e1, col_e2, col_e3 = st.columns(3)
-                
-                # Función de búsqueda de valor seguro (evita errores de índice)
-                def get_val(key, default="Seleccionar..."):
-                    val = st.session_state.get(key, default)
-                    return val if val else default
+    with tab1:
+        st.subheader("Datos del Emisor y Cliente")
+        col_e1, col_e2, col_e3 = st.columns(3)
+        
+        # Función de búsqueda de valor seguro (evita errores de índice)
+        def get_val(key, default="Seleccionar..."):
+            val = st.session_state.get(key, default)
+            return val if val else default
 
-                with col_e1:
-                    ejecutivos_lista = sorted([u['NOMBRE'] for u in st.session_state.usuarios_db])
-                    opciones_ej = ["Seleccionar..."] + ejecutivos_lista
-                    val_ej_actual = get_val('ejecutivo_nom')
-                    
-                    if val_ej_actual != "Seleccionar..." and val_ej_actual not in opciones_ej:
-                        nombre_match = next((u['NOMBRE'] for u in st.session_state.usuarios_db if u['USUARIO'] == val_ej_actual), None)
-                        if nombre_match: val_ej_actual = nombre_match
-                    
-                    idx_ej = opciones_ej.index(val_ej_actual) if val_ej_actual in opciones_ej else 0
+        with col_e1:
+            ejecutivos_lista = sorted([u['NOMBRE'] for u in st.session_state.usuarios_db])
+            opciones_ej = ["Seleccionar..."] + ejecutivos_lista
+            val_ej_actual = get_val('ejecutivo_nom')
+            
+            if val_ej_actual != "Seleccionar..." and val_ej_actual not in opciones_ej:
+                nombre_match = next((u['NOMBRE'] for u in st.session_state.usuarios_db if u['USUARIO'] == val_ej_actual), None)
+                if nombre_match: val_ej_actual = nombre_match
+            
+            idx_ej = opciones_ej.index(val_ej_actual) if val_ej_actual in opciones_ej else 0
                     ejecutivo_nom = st.selectbox("Ejecutivo que firma:", opciones_ej, index=idx_ej, key="ej_sel_final")
                     st.session_state.ejecutivo_nom = ejecutivo_nom
                 
