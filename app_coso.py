@@ -1684,11 +1684,12 @@ else:
                         del st.session_state[key]
                     st.rerun()
 
-        # Botón de vinculación de Drive si falla el token
-        if not obtener_drive_service():
-            st.warning("⚠️ CONEXIÓN DE DRIVE PENDIENTE")
-            autenticar_usuario_oauth()
-            st.divider()
+        # Solo pedir vinculación de Drive a EJECUTIVOS
+        if st.session_state.rol == "EJECUTIVO":
+            if not obtener_drive_service():
+                st.warning("⚠️ CONEXIÓN DE DRIVE PENDIENTE")
+                autenticar_usuario_oauth()
+                st.divider()
 
 def renderizar_gestion_pedidos_central():
     st.title("📦 Centro de Gestión de Pedidos (Administración)")
@@ -1813,31 +1814,53 @@ def renderizar_gestion_pedidos_central():
     except Exception as e:
         st.error(f"Error al cargar gestión de pedidos: {e}")
 
-        # --- NAVEGACIÓN DE VISTAS ---
-        if st.session_state.menu_actual == 'ovo':
-            renderizar_buscador_ovo()
-        elif st.session_state.menu_actual == 'gestion_pedidos':
-            renderizar_gestion_pedidos_central()
-        elif st.session_state.menu_actual == 'pedido':
-            st.title(f"🚀 Formalizar Pedido: {st.session_state.folio_val}")
-            
-            # ... (resto de la vista de pedido)
+# --- NAVEGACIÓN DE VISTAS ---
+if st.session_state.menu_actual == 'ovo':
+    renderizar_buscador_ovo()
+elif st.session_state.menu_actual == 'gestion_pedidos':
+    renderizar_gestion_pedidos_central()
+elif st.session_state.menu_actual == 'pedido':
+    pass 
+elif st.session_state.menu_actual == 'nuevo':
+    pass
 
-        elif st.session_state.menu_actual == 'menu':
-            if st.session_state.rol in ["OPERACIONES", "DIRECCION"]:
-                # --- VISTA PARA SALES OPERATION SUPPORT / DIRECCION ---
-                col_acc1, col_acc2, col_acc3 = st.columns([1, 1, 1])
-                with col_acc1:
-                    if st.button("🔎 BUSCADOR DE VÍNCULOS", use_container_width=True, type="primary"):
-                        st.session_state.menu_actual = 'ovo'
-                        st.rerun()
-                with col_acc2:
-                    if st.button("📦 GESTIÓN DE PEDIDOS", use_container_width=True):
-                        st.session_state.menu_actual = 'gestion_pedidos'
-                        st.rerun()
-                st.divider()
-                renderizar_dashboard_operaciones()
-            else:
+elif st.session_state.menu_actual == 'menu':
+    if st.session_state.rol == "OPERACIONES":
+        # --- VISTA PARA SALES OPERATION SUPPORT (ADMIN_OP) ---
+        st.title("Panel Administrativo")
+        col_acc1, col_acc2, _ = st.columns([1, 1, 1])
+        with col_acc1:
+            if st.button("📦 GESTIÓN DE PEDIDOS", use_container_width=True, type="primary"):
+                st.session_state.menu_actual = 'gestion_pedidos'
+                st.rerun()
+        with col_acc2:
+            if st.button("🔎 BUSCADOR OVO", use_container_width=True):
+                st.session_state.menu_actual = 'ovo'
+                st.rerun()
+        st.divider()
+        st.info("Bienvenido. Selecciona una opción para gestionar los pedidos del ecosistema.")
+    
+    else:
+        # --- VISTA PARA EJECUTIVOS Y DIRECCIÓN ---
+        st.title(f"Panel de Control - {st.session_state.usuario}")
+        col_acc1, col_acc2, col_acc3 = st.columns([1, 1, 1])
+        with col_acc1:
+            if st.button("Crear Cotización Nueva", use_container_width=True, type="primary"):
+                st.session_state.menu_actual = 'nuevo'
+                st.rerun()
+        with col_acc2:
+            if st.button("Buscador OVO", use_container_width=True):
+                st.session_state.menu_actual = 'ovo'
+                st.rerun()
+        
+        # Botón extra solo para DIRECCION
+        if st.session_state.rol == "DIRECCION":
+            with col_acc3:
+                if st.button("📦 GESTIÓN CENTRAL", use_container_width=True):
+                    st.session_state.menu_actual = 'gestion_pedidos'
+                    st.rerun()
+        
+        st.divider()
                 # --- VISTA ESTÁNDAR PARA EJECUTIVOS Y DIRECCIÓN ---
                 st.title(f"Panel de Control - {st.session_state.usuario}")
                 # 1. BOTONES DE ACCIÓN
