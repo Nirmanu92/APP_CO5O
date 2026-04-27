@@ -2265,9 +2265,21 @@ elif st.session_state.menu_actual == 'pedido':
             with c_ped0: st.text_input(f"Proveedor:", value=prov_item, disabled=True, key=f"p_d_{idx}")
             with c_ped1: link_c = st.text_input(f"Link de producto:", value=row.get("Link", ""), key=f"l_d_{idx}")
             with c_ped2:
-                ejs = [p.get("NOMBRE", "") for p in db_prov_full if p.get("PROVEEDOR") == prov_item]
-                if not ejs: cont_c = st.text_input(f"Ejecutivo de Ventas:", key=f"m_d_{idx}")
-                else: cont_c = st.selectbox(f"Ejecutivo de Ventas:", ["N/A"] + ejs, key=f"s_d_{idx}")
+                # Normalizar búsqueda de ejecutivos por proveedor (ignorar mayúsculas/espacios)
+                prov_item_norm = str(prov_item).strip().upper()
+                ejs = [p.get("NOMBRE", "") for p in db_prov_full 
+                       if str(p.get("PROVEEDOR")).strip().upper() == prov_item_norm]
+                ejs = sorted(list(set([e.strip() for e in ejs if e and e.strip()])))
+                
+                if not ejs:
+                    cont_c = st.text_input(f"Ejecutivo de Ventas:", key=f"m_d_{idx}", help="No se encontraron ejecutivos para este proveedor. Escriba uno manualmente.")
+                else:
+                    opciones = ["N/A", "OTRO (Escribir manual)..."] + ejs
+                    sel_ej = st.selectbox(f"Ejecutivo de Ventas:", opciones, key=f"s_d_{idx}")
+                    if sel_ej == "OTRO (Escribir manual)...":
+                        cont_c = st.text_input(f"Nombre del Ejecutivo:", key=f"m_d_{idx}")
+                    else:
+                        cont_c = sel_ej
             detalles_compra[idx] = {"link": link_c, "contacto": cont_c}
 
     st.divider()
