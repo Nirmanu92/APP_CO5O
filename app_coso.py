@@ -2336,86 +2336,85 @@ else:
                             )
                             link_pdf_tecnico = subir_archivo_a_drive(pdf_t_blob, f"PEDIDO_TECNICO_{folio_actual}.pdf")
 
-                            # --- VACIADO GRANULAR DE TODA LA INFORMACIÓN ---
-                            # 1. REGISTRO EN SHEET CENTRAL (PEDIDOS_Y_FACTURAS)
-                            # Orden: Fecha, Folio, Ejecutivo, Cliente, RS_Fiscal, RFC, Metodo_Pago, Uso_CFDI, 
-                            #        Pago_Tipo, Detalle_Credito, Detalle_Financiamiento, Financiera,
-                            #        Origen_Ent, Metodo_Envio, Direccion, Recibe, Tel_Recibe, Link_Maps,
-                            #        Monto, Estatus, Comentarios, Link_PDF, Link_Respaldo, Link_CSF, Link_Arr
-                            row_maestra = [
-                                str(date.today()),          # A: Fecha
-                                folio_actual,               # B: Folio
-                                st.session_state.ejecutivo_nom, # C: Ejecutivo
-                                cliente_actual,             # D: Cliente (Comercial)
-                                razon_f,                    # E: Razón Social Fiscal
-                                rfc_f,                      # F: RFC
-                                metodo_p,                   # G: Método Pago (PUE/PPD)
-                                uso_cfdi,                   # H: Uso CFDI
-                                pago_cliente,               # I: Tipo Pago (Anticipado/Crédito/etc)
-                                dias_credito,               # J: Días Crédito (si aplica)
-                                vigencia_fin,               # K: Vigencia Financiamiento (si aplica)
-                                financiera_fin,             # L: Financiera
-                                origen_ent,                 # M: Origen Entrega
-                                metodo_ent,                 # N: Método Envío (Paquetería/Ruta/etc)
-                                dir_ent,                    # O: Dirección Completa
-                                persona_rec,                # P: Persona que recibe
-                                tel_rec,                    # Q: Teléfono de contacto
-                                maps_link,                  # R: Link de ubicación Maps
-                                monto_total,                # S: Monto Total IVA Incluido
-                                "PEDIDO NUEVO",             # T: Estatus Central
-                                st.session_state.get('coment_val', ''), # U: Comentarios/Notas
-                                link_pdf_tecnico,           # V: Link PDF Técnico
-                                link_pago,                  # W: Link Comprobante / OC
-                                link_csf,                   # X: Link Constancia Fiscal
-                                link_arr                    # Y: Link Arrendamiento
-                            ]
-                            ws_p.append_row(row_maestra)
+                            # --- VACIADO INTELIGENTE DE DATOS (POR ENCABEZADO) ---
+                            def guardar_fila_inteligente(ws, datos_dict):
+                                """Mapea los datos a las columnas correctas basándose en los encabezados de la fila 1."""
+                                headers = [str(h).strip().upper() for h in ws.row_values(1)]
+                                if not headers: return False # Hoja vacía
+                                
+                                fila_a_llenar = [""] * len(headers)
+                                for key, value in datos_dict.items():
+                                    k_norm = key.strip().upper()
+                                    if k_norm in headers:
+                                        idx = headers.index(k_norm)
+                                        fila_a_llenar[idx] = value
+                                ws.append_row(fila_a_llenar)
+                                return True
 
-                            # --- 2. REGISTRO EN HOJA PERSONAL DEL EJECUTIVO ---
+                            # 1. Preparar Diccionario de Datos del Pedido (Maestro)
+                            datos_maestros_dict = {
+                                "FECHA": str(date.today()),
+                                "FOLIO": folio_actual,
+                                "EJECUTIVO": st.session_state.ejecutivo_nom,
+                                "CLIENTE": cliente_actual,
+                                "RAZON_SOCIAL_FISCAL": razon_f,
+                                "RFC": rfc_f,
+                                "METODO_PAGO": metodo_p,
+                                "USO_CFDI": uso_cfdi,
+                                "TIPO_PAGO": pago_cliente,
+                                "DIAS_CREDITO": dias_credito,
+                                "VIGENCIA_FINANCIAMIENTO": vigencia_fin,
+                                "FINANCIERA": financiera_fin,
+                                "ORIGEN_ENTREGA": origen_ent,
+                                "METODO_ENVIO": metodo_ent,
+                                "DIRECCION_ENTREGA": dir_ent,
+                                "PERSONA_RECIBE": persona_rec,
+                                "TELEFONO_RECIBE": tel_rec,
+                                "LINK_MAPS": maps_link,
+                                "MONTO_TOTAL": monto_total,
+                                "ESTATUS": "PEDIDO NUEVO",
+                                "COMENTARIOS": st.session_state.get('coment_val', ''),
+                                "PDF_TECNICO": link_pdf_tecnico,
+                                "COMPROBANTE_RESPALDO": link_pago,
+                                "CONSTANCIA_FISCAL": link_csf,
+                                "ARRENDAMIENTO_PROPUESTA": link_arr
+                            }
+
+                            # 2. Guardar en Hoja Central
+                            guardar_fila_inteligente(ws_p, datos_maestros_dict)
+
+                            # 3. Guardar en Hoja Personal
                             try:
                                 try:
                                     ws_pedidos_local = st.session_state.sh_personal.worksheet("PEDIDOS")
                                 except:
-                                    # Crear con muchas columnas por si el usuario añade más
                                     ws_pedidos_local = st.session_state.sh_personal.add_worksheet(title="PEDIDOS", rows="1000", cols="30")
-                                    # Solo ponemos encabezados si es nueva
-                                    ws_pedidos_local.append_row(["FECHA", "FOLIO", "CLIENTE", "RS_FISCAL", "RFC", "PAGO_TIPO", "CREDITO/FINANC", "ORIGEN", "METODO", "DIRECCION", "RECIBE", "TEL", "MAPS", "MONTO", "ESTATUS", "COMENTARIOS", "PDF_TECNICO", "RESPALDO_LINK", "CSF_LINK"])
+                                    ws_pedidos_local.append_row(list(datos_maestros_dict.keys()))
                                 
-                                # Usamos el mismo orden granular que la maestra para consistencia
-                                row_local = [
-                                    str(date.today()), folio_actual, cliente_actual, razon_f, rfc_f,
-                                    pago_cliente, f"{dias_credito} / {vigencia_fin}",
-                                    origen_ent, metodo_ent, dir_ent, persona_rec, tel_rec,
-                                    maps_link, monto_total, "En espera de Visto Bueno", 
-                                    st.session_state.get('coment_val', ''),
-                                    link_pdf_tecnico, link_pago, link_csf, link_arr
-                                ]
-                                ws_pedidos_local.append_row(row_local)
-                                
-                                # --- 3. VACIADO DE DETALLES (PARTIDAS) ---
+                                guardar_fila_inteligente(ws_pedidos_local, datos_maestros_dict)
+
+                                # 4. Guardar Detalles (Partidas)
                                 try:
                                     ws_ped_det = st.session_state.sh_personal.worksheet("PEDIDOS_DETALLE")
                                 except:
                                     ws_ped_det = st.session_state.sh_personal.add_worksheet(title="PEDIDOS_DETALLE", rows="2000", cols="15")
                                     ws_ped_det.append_row(["FOLIO", "PRODUCTO", "PROVEEDOR", "LINK_COMPRA", "EJECUTIVO_PROV", "CANTIDAD", "MONEDA", "PRECIO_U_SIN_IVA", "SUBTOTAL_SIN_IVA", "TOTAL_CON_IVA"])
                                 
-                                filas_detalle_pedido = []
                                 for idx, row in df_p_final.iterrows():
                                     det_c = detalles_compra.get(idx, {})
-                                    filas_detalle_pedido.append([
-                                        folio_actual, 
-                                        row['Concepto'], 
-                                        row['Proveedor'], 
-                                        det_c.get('link', 'N/A'), 
-                                        det_c.get('contacto', 'N/A'),
-                                        row['Pzas'],
-                                        row.get('Moneda', 'MXN'),
-                                        row['Venta (Sub)'],
-                                        row['Venta (Sub)'] * row['Pzas'],
-                                        row['Venta (IVA)'] * row['Pzas']
-                                    ])
-                                if filas_detalle_pedido:
-                                    ws_ped_det.append_rows(filas_detalle_pedido)
+                                    datos_item = {
+                                        "FOLIO": folio_actual,
+                                        "PRODUCTO": row['Concepto'],
+                                        "PROVEEDOR": row['Proveedor'],
+                                        "LINK_COMPRA": det_c.get('link', 'N/A'),
+                                        "EJECUTIVO_PROV": det_c.get('contacto', 'N/A'),
+                                        "CANTIDAD": row['Pzas'],
+                                        "MONEDA": row.get('Moneda', 'MXN'),
+                                        "PRECIO_U_SIN_IVA": row['Venta (Sub)'],
+                                        "SUBTOTAL_SIN_IVA": row['Venta (Sub)'] * row['Pzas'],
+                                        "TOTAL_CON_IVA": row['Venta (IVA)'] * row['Pzas']
+                                    }
+                                    guardar_fila_inteligente(ws_ped_det, datos_item)
                                     
                             except Exception as e_local:
                                 st.warning(f"Pedido enviado, pero hubo un detalle al actualizar tu hoja personal: {e_local}")
