@@ -1993,8 +1993,8 @@ elif st.session_state.menu_actual == 'menu':
                 df_det_all = pd.DataFrame(ws_det.get_all_records())
             
                 if not df_resumen.empty:
-                col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
-                col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
+                    col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
+                    col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
 
                 # Normalizar nombres de columnas del detalle para el cálculo
                 df_det_norm = df_det_all.copy()
