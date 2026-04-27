@@ -2538,6 +2538,34 @@ elif st.session_state.menu_actual == 'nuevo':
         with col_f4:
             st.session_state.vigencia_val = st.date_input("Vigencia:", value=st.session_state.get('vigencia_val', date.today()), key="vigencia_val_d")
 
+        st.divider()
+        st.subheader("Términos y Condiciones")
+        t1, t2, t3 = st.columns(3)
+        
+        with t1:
+            lista_ent = sorted(list(set([str(t.get('VALOR', '')) for t in st.session_state.terminos_db if t.get('CATEGORIA') == 'ENTREGA'])))
+            opciones_ent = ["Seleccionar..."] + lista_ent
+            val_ent_actual = st.session_state.get('entrega_val', 'Seleccionar...')
+            idx_ent = buscar_index(opciones_ent, val_ent_actual)
+            entrega = st.selectbox("Tiempo de Entrega:", opciones_ent, index=idx_ent, key="ent_sel_final")
+            st.session_state.entrega_val = entrega
+            
+        with t2:
+            lista_pag = sorted(list(set([str(t.get('VALOR', '')) for t in st.session_state.terminos_db if t.get('CATEGORIA') == 'PAGO'])))
+            opciones_pag = ["Seleccionar..."] + lista_pag
+            val_pag_actual = st.session_state.get('pago_val', 'Seleccionar...')
+            idx_pag = buscar_index(opciones_pag, val_pag_actual)
+            pago = st.selectbox("Forma de Pago:", opciones_pag, index=idx_pag, key="pag_sel_final")
+            st.session_state.pago_val = pago
+            
+        with t3:
+            lista_con = sorted(list(set([str(t.get('VALOR', '')) for t in st.session_state.terminos_db if t.get('CATEGORIA') == 'CONDICIONES'])))
+            opciones_con = ["Seleccionar..."] + lista_con
+            val_con_actual = st.session_state.get('condic_val', 'Seleccionar...')
+            idx_con = buscar_index(opciones_con, val_con_actual)
+            condic = st.selectbox("Condiciones Especiales:", opciones_con, index=idx_con, key="con_sel_final")
+            st.session_state.condic_val = condic
+
     with tab2:
         st.subheader("Análisis de Partidas")
         db_prov = st.session_state.get('proveedores_db', [])
