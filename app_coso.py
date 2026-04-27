@@ -1819,10 +1819,6 @@ if st.session_state.menu_actual == 'ovo':
     renderizar_buscador_ovo()
 elif st.session_state.menu_actual == 'gestion_pedidos':
     renderizar_gestion_pedidos_central()
-elif st.session_state.menu_actual == 'pedido':
-    pass 
-elif st.session_state.menu_actual == 'nuevo':
-    pass
 
 elif st.session_state.menu_actual == 'menu':
     if st.session_state.rol == "OPERACIONES":
@@ -2180,9 +2176,9 @@ elif st.session_state.menu_actual == 'menu':
         except Exception as e:
             st.error(f"Error cargando el Dashboard: {e}")
 
-        # --- VISTA: METER PEDIDO (COTIZACIÓN GANADA) ---
-        elif st.session_state.menu_actual == 'pedido':
-            st.title(f"🚀 Formalizar Pedido: {st.session_state.folio_val}")
+# --- VISTA: METER PEDIDO (COTIZACIÓN GANADA) ---
+elif st.session_state.menu_actual == 'pedido':
+    st.title(f"🚀 Formalizar Pedido: {st.session_state.get('folio_val', 'N/A')}")
             
             # 1. Obtener datos base
             df_p_actual = st.session_state.df_partidas
