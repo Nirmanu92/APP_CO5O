@@ -1194,7 +1194,6 @@ def cargar_datos_sesion_usuario():
             def cargar_maestro(nombre_ws):
                 """Lee datos y normaliza las llaves (headers) a MAYÚSCULAS_Y_GUIONES_BAJOS."""
                 import unicodedata
-                log_errores = []
                 
                 def limpiar_llave(txt):
                     if not txt: return ""
@@ -1206,55 +1205,54 @@ def cargar_datos_sesion_usuario():
                     res = []
                     for r in registros:
                         norm = {limpiar_llave(k): v for k, v in r.items()}
+                        # Mapeos especiales para DIRECTORIO
                         if nombre_ws == "DIRECTORIO":
                             if "RAZON_SOCIAL" not in norm:
                                 for alias in ["CLIENTE", "EMPRESA", "RAZON_SOCIAL_FISCAL", "NOMBRE_CLIENTE", "NOMBRE", "RS"]:
                                     if alias in norm:
                                         norm["RAZON_SOCIAL"] = norm[alias]
                                         break
-                                if "RAZON_SOCIAL" not in norm and norm:
-                                    primera_llave = list(norm.keys())[0]
-                                    norm["RAZON_SOCIAL"] = norm[primera_llave]
-                                    
-                            if "CONTACTO" not in norm:
-                                for alias in ["ATENCION", "PERSONA", "CONTACTO_DIRECTO"]:
-                                    if alias in norm:
-                                        norm["CONTACTO"] = norm[alias]
-                                        break
+                        # Mapeos especiales para TERMINOS
+                        if nombre_ws == "TERMINOS":
+                            if "CATEGORIA" not in norm:
+                                for alias in ["TIPO", "CLASE", "RUBRO"]:
+                                    if alias in norm: norm["CATEGORIA"] = norm[alias]; break
+                            if "VALOR" not in norm:
+                                for alias in ["OPCION", "DESCRIPCION", "TEXTO"]:
+                                    if alias in norm: norm["VALOR"] = norm[alias]; break
                         res.append(norm)
                     return res
 
-                # 1. Intentar en hoja personal si existe
+                # 1. Intentar en Archivo Central (PRIORIDAD PARA TERMINOS)
+                if nombre_ws == "TERMINOS" or nombre_ws == "PROVEEDORES":
+                    archivos_centrales = ["TERMINOS_Y_CONDICIONES", "TERMINOS Y CONDICIONES", "MAESTRO_CO5O"]
+                    if nombre_ws == "PROVEEDORES": archivos_centrales = ["PROVEEDORES_MAESTRO", "MAESTRO_CO5O", "PROVEEDORES"]
+                    
+                    for file_name in archivos_centrales:
+                        try:
+                            sh_m = gc.open(file_name)
+                            for ws_name in [nombre_ws, "TERMINOS", "PROVEEDORES", "Hoja1", "HOJA1"]:
+                                try:
+                                    ws_m = sh_m.worksheet(ws_name)
+                                    recs = ws_m.get_all_records()
+                                    if recs: return normalizar_registros(recs)
+                                except: continue
+                        except: continue
+
+                # 2. Intentar en hoja personal
                 if st.session_state.sh_personal:
                     pestanas_intento = [nombre_ws]
                     if nombre_ws == "DIRECTORIO":
-                        pestanas_intento = ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "Contactos", "CONTACTOS", "HOJA1", "Hoja1"]
+                        pestanas_intento = ["DIRECTORIO", "Directorio", "PROSPECTOS", "CLIENTES", "Contactos", "CONTACTOS"]
                     
                     for p in pestanas_intento:
                         try:
                             ws = st.session_state.sh_personal.worksheet(p)
-                            # ... (lógica de lectura dinámica omitida por brevedad en el log, pero integrada abajo)
                             data = ws.get_all_records()
                             if data: return normalizar_registros(data)
                         except: continue
-
-                # 2. Intentar en Archivo Central (variaciones de nombre)
-                for file_name in ["TERMINOS_Y_CONDICIONES", "TERMINOS Y CONDICIONES"]:
-                    try:
-                        sh_m = gc.open(file_name)
-                        for ws_name in [nombre_ws, "Hoja1", "HOJA1", "Sheet1"]:
-                            try:
-                                recs = sh_m.worksheet(ws_name).get_all_records()
-                                if recs: return normalizar_registros(recs)
-                            except: continue
-                    except: continue
                 
-                # 3. Intentar como archivo independiente por nombre exacto
-                try:
-                    recs = gc.open(nombre_ws).sheet1.get_all_records()
-                    return normalizar_registros(recs)
-                except:
-                    return []
+                return []
 
             st.session_state.directorio = cargar_maestro("DIRECTORIO")
             st.session_state.terminos_db = cargar_maestro("TERMINOS")
