@@ -2415,31 +2415,51 @@ elif st.session_state.menu_actual == 'nuevo':
 
         st.divider()
         st.subheader("Términos y Condiciones")
+        
+        # --- CARGA FORZADA CON FALLBACKS INTEGRADOS ---
+        terminos_raw = st.session_state.get('terminos_db', [])
+        
         t1, t2, t3 = st.columns(3)
         
         with t1:
-            lista_ent = sorted(list(set([str(t.get('VALOR', '')) for t in st.session_state.terminos_db if str(t.get('CATEGORIA', '')).strip().upper() == 'ENTREGA'])))
-            opciones_ent = ["Seleccionar..."] + [x for x in lista_ent if x.strip()]
+            # Entrega: Filtrar del DB o usar lista maestra si falla
+            db_ent = [str(t.get('VALOR', '')) for t in terminos_raw if str(t.get('CATEGORIA', '')).strip().upper() == 'ENTREGA']
+            lista_ent = sorted(list(set([x for x in db_ent if x.strip()])))
+            if not lista_ent:
+                lista_ent = ["Inmediata", "3 a 5 días hábiles", "1 a 2 semanas", "Sujeto a existencias"]
+            
+            opciones_ent = ["Seleccionar..."] + lista_ent
             val_ent_actual = st.session_state.get('entrega_val', 'Seleccionar...')
             idx_ent = buscar_index(opciones_ent, val_ent_actual)
-            entrega = st.selectbox("Tiempo de Entrega:", opciones_ent, index=idx_ent, key="ent_sel_final")
-            st.session_state.entrega_val = entrega
+            st.session_state.entrega_val = st.selectbox("Tiempo de Entrega:", opciones_ent, index=idx_ent, key="ent_f")
             
         with t2:
-            lista_pag = sorted(list(set([str(t.get('VALOR', '')) for t in st.session_state.terminos_db if str(t.get('CATEGORIA', '')).strip().upper() == 'PAGO'])))
-            opciones_pag = ["Seleccionar..."] + [x for x in lista_pag if x.strip()]
+            # Pago: Filtrar del DB o usar lista maestra si falla
+            db_pag = [str(t.get('VALOR', '')) for t in terminos_raw if str(t.get('CATEGORIA', '')).strip().upper() == 'PAGO']
+            lista_pag = sorted(list(set([x for x in db_pag if x.strip()])))
+            if not lista_pag:
+                lista_pag = ["Contado", "50% Anticipo / 50% Entrega", "Crédito 15 días", "Crédito 30 días"]
+            
+            opciones_pag = ["Seleccionar..."] + lista_pag
             val_pag_actual = st.session_state.get('pago_val', 'Seleccionar...')
             idx_pag = buscar_index(opciones_pag, val_pag_actual)
-            pago = st.selectbox("Forma de Pago:", opciones_pag, index=idx_pag, key="pag_sel_final")
-            st.session_state.pago_val = pago
+            st.session_state.pago_val = st.selectbox("Forma de Pago:", opciones_pag, index=idx_pag, key="pag_f")
             
         with t3:
-            lista_con = sorted(list(set([str(t.get('VALOR', '')) for t in st.session_state.terminos_db if str(t.get('CATEGORIA', '')).strip().upper() == 'CONDICIONES'])))
-            opciones_con = ["Seleccionar..."] + [x for x in lista_con if x.strip()]
+            # Condiciones: Filtrar del DB o usar lista maestra si falla
+            db_con = [str(t.get('VALOR', '')) for t in terminos_raw if str(t.get('CATEGORIA', '')).strip().upper() == 'CONDICIONES']
+            lista_con = sorted(list(set([x for x in db_con if x.strip()])))
+            if not lista_con:
+                lista_con = ["Precios sujetos a cambio sin previo aviso", "Garantía de 1 año", "L.A.B. Nuestras oficinas"]
+            
+            opciones_con = ["Seleccionar..."] + lista_con
             val_con_actual = st.session_state.get('condic_val', 'Seleccionar...')
             idx_con = buscar_index(opciones_con, val_con_actual)
-            condic = st.selectbox("Condiciones Especiales:", opciones_con, index=idx_con, key="con_sel_final")
-            st.session_state.condic_val = condic
+            st.session_state.condic_val = st.selectbox("Condiciones Especiales:", opciones_con, index=idx_con, key="con_f")
+
+        if not terminos_raw:
+            st.caption("ℹ️ Nota: Mostrando opciones estándar del sistema.")
+
 
     with tab2:
         st.subheader("Análisis de Partidas")
@@ -2651,7 +2671,13 @@ elif st.session_state.menu_actual == 'nuevo':
                     st.session_state.ultimo_contacto_val = fecha_contacto
 
                 if st.button("CONFIRMAR Y GUARDAR TODO", use_container_width=True, type="primary"):
-                    if "Seleccionar..." in [ejecutivo_nom, cliente_sel, contacto_sel, entrega, pago, condic] or not st.session_state.folio_val:
+                    # Extraer valores de sesión para validación y cabecera
+                    val_ent = st.session_state.get('entrega_val', 'Seleccionar...')
+                    val_pag = st.session_state.get('pago_val', 'Seleccionar...')
+                    val_con = st.session_state.get('condic_val', 'Seleccionar...')
+                    val_vig = st.session_state.get('vigencia_val', date.today())
+                    
+                    if "Seleccionar..." in [ejecutivo_nom, cliente_sel, contacto_sel, val_ent, val_pag, val_con] or not st.session_state.folio_val:
                         st.error("Revisa que todos los campos obligatorios en 'Generales' estén llenos.")
                     else:
                         try:
@@ -2695,8 +2721,8 @@ elif st.session_state.menu_actual == 'nuevo':
 
                                 cab = {
                                     "folio": folio_actual, "ejecutivo": ejecutivo_nom, "email": mail_e, "tel": tel_e, 
-                                    "cliente": cliente_sel, "contacto": contacto_sel, "vigencia": str(vigencia), 
-                                    "entrega": entrega, "pago": pago, "condiciones": condic,
+                                    "cliente": cliente_sel, "contacto": contacto_sel, "vigencia": str(val_vig), 
+                                    "entrega": val_ent, "pago": val_pag, "condiciones": val_con,
                                     "moneda": st.session_state.get('moneda_val', 'MXN'),
                                     "tc": st.session_state.get('tc_val', 1.0)
                                 }
@@ -2709,11 +2735,11 @@ elif st.session_state.menu_actual == 'nuevo':
                                 except Exception as e:
                                     st.error(f"Error crítico: No se pudo subir el PDF a Drive. {e}")
                                 
-                                # Registro en Resumen (Persistencia de Moneda y TC en O y P, Último Contacto en Q)
+                                # Registro en Resumen
                                 datos_res = [
                                     folio_actual, ejecutivo_nom, mail_e, tel_e, str(date.today()), 
-                                    link_pdf_drive, cliente_sel, contacto_sel, str(vigencia), 
-                                    entrega, pago, condic, comentarios, estatus_final,
+                                    link_pdf_drive, cliente_sel, contacto_sel, str(val_vig), 
+                                    val_ent, val_pag, val_con, comentarios, estatus_final,
                                     st.session_state.get('moneda_val', 'MXN'),
                                     st.session_state.get('tc_val', 1.0),
                                     fecha_cont_str
