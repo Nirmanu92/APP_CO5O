@@ -2443,10 +2443,11 @@ elif st.session_state.menu_actual == 'pedido':
             st.rerun()
 
 # --- VISTA: GENERADOR DE COTIZACIÓN (NUEVO / EDITAR) ---
-elif st.session_state.menu_actual == 'nuevo':            st.header(f"{'Editando' if st.session_state.get('folio_val') else 'Nueva'} Cotización")
-            
-            # Crear las pestañas
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Generales", "Partidas", "Ilustraciones", "Evidencias", "Finalizar"])
+elif st.session_state.menu_actual == 'nuevo':
+    st.header(f"{'Editando' if st.session_state.get('folio_val') else 'Nueva'} Cotización")
+    
+    # Crear las pestañas
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Generales", "Partidas", "Ilustraciones", "Evidencias", "Finalizar"])
 
             with tab1:
                 st.subheader("Datos del Emisor y Cliente")
