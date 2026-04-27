@@ -2400,11 +2400,24 @@ elif st.session_state.menu_actual == 'pedido':
                     # --- EVITAR DUPLICADOS EN PEDIDOS (CENTRAL Y LOCAL) ---
                     # En la hoja de pedidos, el Folio está en la Columna B (índice 2)
                     try:
+                        sh_p = gc.open_by_key(ID_SHEET_PEDIDOS)
+                        ws_p = sh_p.sheet1
                         folios_p = ws_p.col_values(2)
                         if str(folio_actual) in [str(f) for f in folios_p]:
                             idx_p = [str(f) for f in folios_p].index(str(folio_actual)) + 1
                             ws_p.delete_rows(idx_p)
-                    except: pass
+                        
+                        # Limpiar Detalle Central
+                        try:
+                            ws_p_det = sh_p.worksheet("PEDIDOS_DETALLE")
+                            folios_p_det = ws_p_det.col_values(1)
+                            filas_borrar_p = [i + 1 for i, v in enumerate(folios_p_det) if str(v) == str(folio_actual)]
+                            if filas_borrar_p:
+                                for f_b in reversed(filas_borrar_p): ws_p_det.delete_rows(f_b)
+                        except: ws_p_det = None
+                    except: 
+                        ws_p = None
+                        ws_p_det = None
 
                     # Calcular Monto Total para el registro central
                     monto_total = (df_p_final["Venta (IVA)"] * df_p_final["Pzas"]).sum()
@@ -2435,15 +2448,43 @@ elif st.session_state.menu_actual == 'pedido':
                         "CONSTANCIA_FISCAL": l_csf,
                         "ARRENDAMIENTO_PROPUESTA": subir_archivo_a_drive(file_arrendamiento.read(), f"ARR_{folio_actual}.pdf") if pago_cliente == "Financiamiento" and file_arrendamiento else ""
                     }
-                    guardar_fila_inteligente(ws_p, datos_m)
+                    if ws_p: guardar_fila_inteligente(ws_p, datos_m)
+
+                    # Preparar filas de detalle
+                    filas_det_pedido = []
+                    for r_idx, r in df_p_final.iterrows():
+                        det_c = detalles_compra.get(r_idx, {})
+                        filas_det_pedido.append([
+                            folio_actual, r.get("Tipo", "PARTIDA"), r["Concepto"], r["Descripción"],
+                            r["Pzas"], r.get("SKU", ""), r.get("Proveedor", ""), 
+                            det_c.get("link", ""), det_c.get("contacto", ""),
+                            r.get("Costo (Sub)", 0), r.get("Venta (Sub)", 0),
+                            (r.get("Venta (Sub)", 0) - r.get("Costo (Sub)", 0) - r.get("Envio Sec", 0)) * r["Pzas"],
+                            str(date.today())
+                        ])
+                    
+                    if ws_p_det and filas_det_pedido:
+                        ws_p_det.append_rows(filas_det_pedido)
 
                     try:
-                        ws_l = st.session_state.sh_personal.worksheet("PEDIDOS")
+                        sh_l = st.session_state.sh_personal
+                        ws_l = sh_l.worksheet("PEDIDOS")
                         folios_l = ws_l.col_values(2)
                         if str(folio_actual) in [str(f) for f in folios_l]:
                             idx_l = [str(f) for f in folios_l].index(str(folio_actual)) + 1
                             ws_l.delete_rows(idx_l)
                         guardar_fila_inteligente(ws_l, datos_m)
+
+                        # Detalle Local
+                        try:
+                            ws_l_det = sh_l.worksheet("PEDIDOS_DETALLE")
+                            folios_l_det = ws_l_det.col_values(1)
+                            filas_borrar_l = [i + 1 for i, v in enumerate(folios_l_det) if str(v) == str(folio_actual)]
+                            if filas_borrar_l:
+                                for f_b in reversed(filas_borrar_l): ws_l_det.delete_rows(f_b)
+                            if filas_det_pedido:
+                                ws_l_det.append_rows(filas_det_pedido)
+                        except: pass
                     except: pass
 
                     st.session_state.pedido_exitoso = True
