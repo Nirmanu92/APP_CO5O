@@ -1866,23 +1866,23 @@ elif st.session_state.menu_actual == 'menu':
         try:
             ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
             df_resumen = pd.DataFrame(ws_res.get_all_records())
-                    
-                    ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
-                    df_det_all = pd.DataFrame(ws_det.get_all_records())
-                    
-                    if not df_resumen.empty:
-                        col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
-                        col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
+            
+            ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
+            df_det_all = pd.DataFrame(ws_det.get_all_records())
+            
+            if not df_resumen.empty:
+                col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
+                col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
 
-                        # Normalizar nombres de columnas del detalle para el cálculo
-                        df_det_norm = df_det_all.copy()
-                        df_det_norm.columns = [c.upper().replace(" ", "_") for c in df_det_norm.columns]
-                        col_folio_det = df_det_norm.columns[0]
+                # Normalizar nombres de columnas del detalle para el cálculo
+                df_det_norm = df_det_all.copy()
+                df_det_norm.columns = [c.upper().replace(" ", "_") for c in df_det_norm.columns]
+                col_folio_det = df_det_norm.columns[0]
 
-                        # Identificar columnas de monto y utilidad de forma robusta
-                        col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL" in c or "PFACTURA" in c), df_det_norm.columns[-3])
-                        # Búsqueda muy flexible para Utilidad
-                        col_util_src = next((c for c in df_det_norm.columns if "UTILIDAD" in c or "UTIL_$" in c), None)
+                # Identificar columnas de monto y utilidad de forma robusta
+                col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL" in c or "PFACTURA" in c), df_det_norm.columns[-3])
+                # Búsqueda muy flexible para Utilidad
+                col_util_src = next((c for c in df_det_norm.columns if "UTILIDAD" in c or "UTIL_$" in c), None)
                         
                         # Si no encuentra por nombre, usar el índice típico de la columna T (índice 19)
                         if not col_util_src:
