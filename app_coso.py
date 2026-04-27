@@ -1861,35 +1861,11 @@ elif st.session_state.menu_actual == 'menu':
                     st.rerun()
         
         st.divider()
-                # --- VISTA ESTÁNDAR PARA EJECUTIVOS Y DIRECCIÓN ---
-                st.title(f"Panel de Control - {st.session_state.usuario}")
-                # 1. BOTONES DE ACCIÓN
-                col_acc1, col_acc2, _ = st.columns([1, 1, 1])
-                with col_acc1:
-                    if st.button("Crear Cotización Nueva", use_container_width=True, type="primary"):
-                        # LIMPIEZA TOTAL DE MEMORIA PARA NUEVA COTIZACIÓN
-                        keys_to_reset = [
-                            'folio_val', 'folio_original_edicion', 'ultimo_cliente_folio', 'ultimo_ejecutivo_folio',
-                            'vigencia_val', 'entrega_val', 'pago_val', 'condic_val', 'coment_val', 'estatus_val',
-                            'ultimo_contacto_val', 'df_partidas', 'dict_fotos', 'dict_fotos_links', 'registro_exitoso', 
-                            'cliente_sel', 'contacto_sel', 'ejecutivo_nom'
-                        ]
-                        for k in keys_to_reset:
-                            if k in st.session_state: del st.session_state[k]
-                        st.session_state.menu_actual = 'nuevo'
-                        st.rerun()
-                
-                with col_acc2:
-                    if st.button("Buscador de Vínculos y Operaciones", use_container_width=True):
-                        st.session_state.menu_actual = 'ovo'
-                        st.rerun()
-                
-                st.divider()
 
-                # 2. CÁLCULO DE MÉTRICAS (KPIs) e HISTORIAL
-                try:
-                    ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
-                    df_resumen = pd.DataFrame(ws_res.get_all_records())
+        # 2. CÁLCULO DE MÉTRICAS (KPIs) e HISTORIAL
+        try:
+            ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
+            df_resumen = pd.DataFrame(ws_res.get_all_records())
                     
                     ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
                     df_det_all = pd.DataFrame(ws_det.get_all_records())
