@@ -1781,7 +1781,9 @@ def renderizar_gestion_pedidos_central():
                     st.markdown("**Logística**")
                     st.write(f"Origen: {row.get('ORIGEN_ENTREGA', 'N/A')}")
                     st.write(f"Método: {row.get('METODO_ENVIO', 'N/A')}")
+                    st.write(f"Dirección: {row.get('DIRECCION_ENTREGA', 'N/A')}")
                     st.write(f"Recibe: {row.get('PERSONA_RECIBE', 'N/A')}")
+                    st.write(f"Tel: {row.get('TEL_CONTACTO', 'N/A')}")
                     maps = row.get('LINK_MAPS', '')
                     if maps and str(maps).startswith("http"):
                         st.link_button("📍 VER UBICACIÓN MAPS", maps, use_container_width=True)
@@ -2388,7 +2390,7 @@ elif st.session_state.menu_actual == 'pedido':
                         "METODO_PAGO": metodo_p,
                         "ORIGEN_ENTREGA": origen_ent,
                         "METODO_ENVIO": metodo_ent,
-                        "DIR_ENTREGA": dir_ent,
+                        "DIRECCION_ENTREGA": dir_ent,
                         "PERSONA_RECIBE": persona_rec,
                         "TEL_CONTACTO": tel_rec,
                         "LINK_MAPS": maps_link,
