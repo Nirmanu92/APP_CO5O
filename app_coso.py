@@ -2291,20 +2291,19 @@ elif st.session_state.menu_actual == 'pedido':
         modo_respaldo = st.radio("Modo de respaldo del pedido:", ["Comprobante de pago", "Orden de compra (OC)"], horizontal=True, key="mod_resp_p")
         pago_cliente = st.selectbox("Pago de cliente:", ["Anticipado", "Linea de crédito", "Financiamiento", "Otro modo"], key="p_cli_p")
 
+    # Inicializar variables de pago para evitar errores de referencia
+    dias_credito, vigencia_fin, financiera_fin, file_arrendamiento = "N/A", "N/A", "N/A", None
+
     pc1, pc2 = st.columns(2)
     if pago_cliente == "Linea de crédito":
         with pc1:
             dias_credito = st.selectbox("Opciones de crédito:", ["7 Días", "15 Días", "30 Días"], key="dias_c_p")
-            vigencia_fin, financiera_fin = "N/A", "N/A"
     elif pago_cliente == "Financiamiento":
         with pc1:
             financiera_fin = st.selectbox("Financiera:", ["DFS", "HPE", "Otro"], key="finan_p")
             vigencia_fin = st.selectbox("Vigencia:", ["2 años", "3 años", "4 años"], key="vig_p")
         with pc2:
             file_arrendamiento = st.file_uploader("Cargar propuesta", type=["pdf"], key="f_arr_p")
-            dias_credito = "N/A"
-    else:
-        dias_credito, vigencia_fin, financiera_fin = "N/A", "N/A", "N/A"
 
     st.divider()
     a1, a2 = st.columns(2)
@@ -2375,7 +2374,35 @@ elif st.session_state.menu_actual == 'pedido':
                             if k.upper() in headers: fila[headers.index(k.upper())] = v
                         ws.append_row(fila)
 
-                    datos_m = {"FECHA": str(date.today()), "FOLIO": folio_actual, "EJECUTIVO": st.session_state.ejecutivo_nom, "CLIENTE": cliente_actual, "RAZON_SOCIAL_FISCAL": razon_f, "RFC": rfc_f, "ESTATUS": "PEDIDO NUEVO", "PDF_TECNICO": l_pdf, "COMPROBANTE_RESPALDO": l_pago}
+                    # Calcular Monto Total para el registro central
+                    monto_total = (df_p_final["Venta (IVA)"] * df_p_final["Pzas"]).sum()
+
+                    datos_m = {
+                        "FECHA": str(date.today()), 
+                        "FOLIO": folio_actual, 
+                        "EJECUTIVO": st.session_state.ejecutivo_nom, 
+                        "CLIENTE": cliente_actual, 
+                        "RAZON_SOCIAL_FISCAL": razon_f, 
+                        "RFC": rfc_f, 
+                        "USO_CFDI": uso_cfdi,
+                        "METODO_PAGO": metodo_p,
+                        "ORIGEN_ENTREGA": origen_ent,
+                        "METODO_ENVIO": metodo_ent,
+                        "DIR_ENTREGA": dir_ent,
+                        "PERSONA_RECIBE": persona_rec,
+                        "TEL_CONTACTO": tel_rec,
+                        "LINK_MAPS": maps_link,
+                        "TIPO_PAGO": pago_cliente,
+                        "DIAS_CREDITO": dias_credito,
+                        "VIGENCIA_FINANCIAMIENTO": vigencia_fin,
+                        "FINANCIERA": financiera_fin,
+                        "MONTO_TOTAL": monto_total,
+                        "ESTATUS": "PEDIDO NUEVO", 
+                        "PDF_TECNICO": l_pdf, 
+                        "COMPROBANTE_RESPALDO": l_pago,
+                        "CONSTANCIA_FISCAL": l_csf,
+                        "ARRENDAMIENTO_PROPUESTA": subir_archivo_a_drive(file_arrendamiento.read(), f"ARR_{folio_actual}.pdf") if pago_cliente == "Financiamiento" and file_arrendamiento else ""
+                    }
                     guardar_fila_inteligente(ws_p, datos_m)
 
                     try:
