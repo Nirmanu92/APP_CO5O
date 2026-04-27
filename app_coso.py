@@ -2719,7 +2719,7 @@ elif st.session_state.menu_actual == 'nuevo':
                     st.markdown(f"**Cliente:** {st.session_state.get('cliente_sel', 'No seleccionado')}")
                     st.markdown(f"**Atención:** {st.session_state.get('contacto_sel', 'No seleccionado')}")
                     st.markdown(f"**Folio:** {st.session_state.get('folio_val', 'N/A')}")
-                    st.markdown(f"**Vigencia:** {vigencia}")
+                    st.markdown(f"**Vigencia:** {st.session_state.get('vigencia_val', 'N/A')}")
                 with c_r2:
                     st.markdown(f"**Pago:** {st.session_state.get('pago_val', 'No seleccionado')}")
                     st.markdown(f"**Entrega:** {st.session_state.get('entrega_val', 'No seleccionado')}")
