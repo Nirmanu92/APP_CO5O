@@ -1883,30 +1883,30 @@ elif st.session_state.menu_actual == 'menu':
                 col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL" in c or "PFACTURA" in c), df_det_norm.columns[-3])
                 # Búsqueda muy flexible para Utilidad
                 col_util_src = next((c for c in df_det_norm.columns if "UTILIDAD" in c or "UTIL_$" in c), None)
-                        
-                        # Si no encuentra por nombre, usar el índice típico de la columna T (índice 19)
-                        if not col_util_src:
-                            col_util_src = df_det_norm.columns[19] if len(df_det_norm.columns) > 19 else df_det_norm.columns[-1]
+                
+                # Si no encuentra por nombre, usar el índice típico de la columna T (índice 19)
+                if not col_util_src:
+                    col_util_src = df_det_norm.columns[19] if len(df_det_norm.columns) > 19 else df_det_norm.columns[-1]
 
-                        def clean_num(x):
-                            if isinstance(x, str):
-                                # Eliminar $, comas y espacios para convertir a número puro
-                                limpio = x.replace("$", "").replace(",", "").replace(" ", "").strip()
-                                return pd.to_numeric(limpio, errors='coerce')
-                            return pd.to_numeric(x, errors='coerce')
+                def clean_num(x):
+                    if isinstance(x, str):
+                        # Eliminar $, comas y espacios para convertir a número puro
+                        limpio = x.replace("$", "").replace(",", "").replace(" ", "").strip()
+                        return pd.to_numeric(limpio, errors='coerce')
+                    return pd.to_numeric(x, errors='coerce')
 
-                        df_montos_util = df_det_norm.groupby(col_folio_det).agg({
-                            col_monto_src: lambda x: x.apply(clean_num).sum(),
-                            col_util_src: lambda x: x.apply(clean_num).sum()
-                        }).reset_index()
-                        df_montos_util.columns = [col_folio, 'MONTO_TOTAL', 'UTILIDAD_TOTAL']
+                df_montos_util = df_det_norm.groupby(col_folio_det).agg({
+                    col_monto_src: lambda x: x.apply(clean_num).sum(),
+                    col_util_src: lambda x: x.apply(clean_num).sum()
+                }).reset_index()
+                df_montos_util.columns = [col_folio, 'MONTO_TOTAL', 'UTILIDAD_TOTAL']
 
-                        df_stats = pd.merge(df_resumen, df_montos_util, on=col_folio, how='left').fillna(0)
+                df_stats = pd.merge(df_resumen, df_montos_util, on=col_folio, how='left').fillna(0)
 
-                        # 2. Definir universos
-                        estatus_cerrados = ["100% Ganada", "0% Cancelada", "100% Pedido"]
-                        df_activos_stats = df_stats[~df_stats['ESTATUS'].isin(estatus_cerrados)]
-                        df_cerrados_stats = df_stats[df_stats['ESTATUS'].isin(estatus_cerrados)]
+                # 2. Definir universos
+                estatus_cerrados = ["100% Ganada", "0% Cancelada", "100% Pedido"]
+                df_activos_stats = df_stats[~df_stats['ESTATUS'].isin(estatus_cerrados)]
+                df_cerrados_stats = df_stats[df_stats['ESTATUS'].isin(estatus_cerrados)]
 
                         monto_activo = df_activos_stats['MONTO_TOTAL'].sum()
                         util_activa = df_activos_stats['UTILIDAD_TOTAL'].sum()
