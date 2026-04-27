@@ -1769,31 +1769,41 @@ def renderizar_gestion_pedidos_central():
             ejecutivo = row.get('EJECUTIVO', 'N/A')
             
             with st.expander(f"📄 {folio} | {cliente} | {ejecutivo} | ${monto:,.2f} | {estatus}"):
+                # Helper para búsqueda flexible en el row
+                def get_flex(r, key_buscada):
+                    k_norm = lambda x: str(x).upper().replace(" ", "").replace("_", "").replace("-", "")
+                    target = k_norm(key_buscada)
+                    for k, v in r.items():
+                        if k_norm(k) == target: return v
+                    return "N/A"
+
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     st.markdown("**Datos Fiscales**")
-                    st.write(f"RFC: {row.get('RFC', 'N/A')}")
-                    st.write(f"RS: {row.get('RAZON_SOCIAL_FISCAL', 'N/A')}")
-                    st.write(f"Uso: {row.get('USO_CFDI', 'N/A')}")
-                    st.write(f"Método: {row.get('METODO_PAGO', 'N/A')}")
+                    st.write(f"RFC: {get_flex(row, 'RFC')}")
+                    st.write(f"RS: {get_flex(row, 'RAZON_SOCIAL_FISCAL')}")
+                    st.write(f"Uso: {get_flex(row, 'USO_CFDI')}")
+                    st.write(f"Método: {get_flex(row, 'METODO_PAGO')}")
                 
                 with c2:
                     st.markdown("**Logística**")
-                    st.write(f"Origen: {row.get('ORIGEN_ENTREGA', 'N/A')}")
-                    st.write(f"Método: {row.get('METODO_ENVIO', 'N/A')}")
-                    st.write(f"Dirección: {row.get('DIRECCION_ENTREGA', 'N/A')}")
-                    st.write(f"Recibe: {row.get('PERSONA_RECIBE', 'N/A')}")
-                    st.write(f"Tel: {row.get('TEL_CONTACTO', 'N/A')}")
-                    maps = row.get('LINK_MAPS', '')
+                    st.write(f"Origen: {get_flex(row, 'ORIGEN_ENTREGA')}")
+                    st.write(f"Método: {get_flex(row, 'METODO_ENVIO')}")
+                    st.write(f"Dirección: {get_flex(row, 'DIRECCION_ENTREGA')}")
+                    st.write(f"Recibe: {get_flex(row, 'PERSONA_RECIBE')}")
+                    st.write(f"Tel: {get_flex(row, 'TEL_CONTACTO')}")
+                    maps = get_flex(row, 'LINK_MAPS')
                     if maps and str(maps).startswith("http"):
                         st.link_button("📍 VER UBICACIÓN MAPS", maps, use_container_width=True)
                 
                 with c3:
                     st.markdown("**Pago y Crédito**")
-                    st.write(f"Tipo: {row.get('TIPO_PAGO', 'N/A')}")
-                    if row.get('DIAS_CREDITO') != "N/A": st.write(f"Días: {row.get('DIAS_CREDITO')}")
-                    if row.get('VIGENCIA_FINANCIAMIENTO') != "N/A": st.write(f"Vigencia: {row.get('VIGENCIA_FINANCIAMIENTO')}")
-                    st.write(f"Financiera: {row.get('FINANCIERA', 'N/A')}")
+                    st.write(f"Tipo: {get_flex(row, 'TIPO_PAGO')}")
+                    d_cred = get_flex(row, 'DIAS_CREDITO')
+                    if d_cred != "N/A": st.write(f"Días: {d_cred}")
+                    v_fin = get_flex(row, 'VIGENCIA_FINANCIAMIENTO')
+                    if v_fin != "N/A": st.write(f"Vigencia: {v_fin}")
+                    st.write(f"Financiera: {get_flex(row, 'FINANCIERA')}")
 
                 st.divider()
                 
@@ -2370,10 +2380,21 @@ elif st.session_state.menu_actual == 'pedido':
                     l_pdf = subir_archivo_a_drive(pdf_t, f"PEDIDO_{folio_actual}.pdf")
 
                     def guardar_fila_inteligente(ws, datos_dict):
-                        headers = [str(h).strip().upper() for h in ws.row_values(1)]
-                        fila = [""] * len(headers)
+                        headers_raw = ws.row_values(1)
+                        # Normalizar headers: quitar espacios, acentos, guiones y pasar a mayúsculas
+                        def norm(t):
+                            import unicodedata
+                            s = "".join(c for c in unicodedata.normalize('NFD', str(t)) if unicodedata.category(c) != 'Mn')
+                            return s.upper().replace(" ", "").replace("_", "").replace("-", "").strip()
+                        
+                        headers_norm = [norm(h) for h in headers_raw]
+                        fila = [""] * len(headers_raw)
+                        
                         for k, v in datos_dict.items():
-                            if k.upper() in headers: fila[headers.index(k.upper())] = v
+                            k_norm = norm(k)
+                            if k_norm in headers_norm:
+                                idx = headers_norm.index(k_norm)
+                                fila[idx] = v
                         ws.append_row(fila)
 
                     # Calcular Monto Total para el registro central
