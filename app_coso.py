@@ -1982,9 +1982,12 @@ elif st.session_state.menu_actual == 'menu':
         st.divider()
 
         # 2. CÁLCULO DE MÉTRICAS (KPIs) e HISTORIAL
-        try:
-            ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
-            df_resumen = pd.DataFrame(ws_res.get_all_records())
+        if st.session_state.sh_personal is None:
+            st.info("💡 Su cuenta no tiene una hoja de cotizaciones personales vinculada. Utilice los botones de navegación superiores para gestionar el sistema.")
+        else:
+            try:
+                ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
+                df_resumen = pd.DataFrame(ws_res.get_all_records())
             
             ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
             df_det_all = pd.DataFrame(ws_det.get_all_records())
