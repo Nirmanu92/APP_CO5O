@@ -1822,7 +1822,7 @@ def renderizar_gestion_pedidos_central():
                         if link and str(link).startswith("http"):
                             st.link_button(f"📄 ABRIR {label}", link, use_container_width=True)
                         else:
-                            st.button(f"🚫 SIN {label}", disabled=True, use_container_width=True, key=f"dis_{folio}_{label}")
+                            st.button(f"🚫 SIN {label}", disabled=True, use_container_width=True, key=f"dis_{i}_{label}")
 
                 st.divider()
                 
@@ -1831,10 +1831,10 @@ def renderizar_gestion_pedidos_central():
                 with c_st1:
                     nuevo_estatus = st.selectbox("Cambiar Estatus del Pedido:", 
                                                ["PEDIDO NUEVO", "EN REVISIÓN", "VISTO BUENO", "FACTURADO", "EN RUTA / PAQUETERÍA", "ENTREGADO", "ERROR EN DATOS"], 
-                                               index=0, key=f"st_sel_{folio}")
+                                               index=0, key=f"st_sel_{i}_{folio}")
                 with c_st2:
                     st.write("")
-                    if st.button("ACTUALIZAR ESTATUS", key=f"btn_st_{folio}", use_container_width=True, type="primary"):
+                    if st.button("ACTUALIZAR ESTATUS", key=f"btn_st_{i}_{folio}", use_container_width=True, type="primary"):
                         try:
                             # Buscar fila por Folio para actualizar estatus
                             folios_col = ws_p.col_values(2) # Columna B es Folio
