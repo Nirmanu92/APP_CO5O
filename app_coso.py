@@ -2332,7 +2332,14 @@ elif st.session_state.menu_actual == 'pedido':
                         {"folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, "cliente": cliente_actual, "pago": p_final_str}, 
                         df_p_final, 
                         {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p}, 
-                        {"dir_entrega": dir_ent, "persona_recibe": persona_rec}, 
+                        {
+                            "dir_entrega": dir_ent, 
+                            "persona_recibe": persona_rec, 
+                            "tel_contacto": tel_rec,
+                            "origen": origen_ent,
+                            "metodo": metodo_ent,
+                            "maps": maps_link
+                        }, 
                         {}, 
                         detalles_compra
                     )
