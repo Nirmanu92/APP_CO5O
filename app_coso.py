@@ -2397,6 +2397,15 @@ elif st.session_state.menu_actual == 'pedido':
                                 fila[idx] = v
                         ws.append_row(fila)
 
+                    # --- EVITAR DUPLICADOS EN PEDIDOS (CENTRAL Y LOCAL) ---
+                    # En la hoja de pedidos, el Folio está en la Columna B (índice 2)
+                    try:
+                        folios_p = ws_p.col_values(2)
+                        if str(folio_actual) in [str(f) for f in folios_p]:
+                            idx_p = [str(f) for f in folios_p].index(str(folio_actual)) + 1
+                            ws_p.delete_rows(idx_p)
+                    except: pass
+
                     # Calcular Monto Total para el registro central
                     monto_total = (df_p_final["Venta (IVA)"] * df_p_final["Pzas"]).sum()
 
@@ -2430,6 +2439,10 @@ elif st.session_state.menu_actual == 'pedido':
 
                     try:
                         ws_l = st.session_state.sh_personal.worksheet("PEDIDOS")
+                        folios_l = ws_l.col_values(2)
+                        if str(folio_actual) in [str(f) for f in folios_l]:
+                            idx_l = [str(f) for f in folios_l].index(str(folio_actual)) + 1
+                            ws_l.delete_rows(idx_l)
                         guardar_fila_inteligente(ws_l, datos_m)
                     except: pass
 
