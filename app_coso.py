@@ -1995,7 +1995,6 @@ elif st.session_state.menu_actual == 'menu':
                 if not df_resumen.empty:
                     col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
                     col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
-
                 # Normalizar nombres de columnas del detalle para el cálculo
                 df_det_norm = df_det_all.copy()
                 df_det_norm.columns = [c.upper().replace(" ", "_") for c in df_det_norm.columns]
@@ -2297,10 +2296,10 @@ elif st.session_state.menu_actual == 'menu':
                 with t_ab: renderizar_lista_cotizaciones(df_abiertas)
                 with t_ce: renderizar_lista_cotizaciones(df_cerradas)
 
-            else:
-                st.info("Aún no tienes cotizaciones registradas. ¡Crea la primera!")
-        except Exception as e:
-            st.error(f"Error cargando el Dashboard: {e}")
+                else:
+                    st.info("Aún no tienes cotizaciones registradas. ¡Crea la primera!")
+            except Exception as e:
+                st.error(f"Error cargando el Dashboard: {e}")
 
 # --- VISTA: METER PEDIDO (COTIZACIÓN GANADA) ---
 elif st.session_state.menu_actual == 'pedido':
@@ -2595,7 +2594,7 @@ elif st.session_state.menu_actual == 'nuevo':
             df_analisis["Total Línea"] = (df_analisis["Venta (IVA)"] * df_analisis["Pzas"]).round(2)
 
             st.write("Análisis Detallado de Partidas")
-            
+
             # --- DESGLOSE FINANCIERO MAESTRO ---
             df_analisis["Costo unit. prod.prov. sin iva"] = df_analisis["Costo (Sub)"]
             df_analisis["Costo unit. prod. prov. con iva"] = df_analisis["Costo (IVA)"]
@@ -2603,12 +2602,12 @@ elif st.session_state.menu_actual == 'nuevo':
             df_analisis["total prov con iva"] = (df_analisis["Costo (IVA)"] * df_analisis["Pzas"]).round(2)
             df_analisis["Envío Local (Unit)"] = df_analisis["Envio Sec"]
             df_analisis["Envío Local (Total)"] = (df_analisis["Envio Sec"] * df_analisis["Pzas"]).round(2)
-            
+
             df_analisis["venta unitaria sin iva"] = df_analisis["Venta (Sub)"]
             df_analisis["venta unitaria con iva"] = df_analisis["Venta (IVA)"]
             df_analisis["venta total sin iva"] = (df_analisis["Venta (Sub)"] * df_analisis["Pzas"]).round(2)
             df_analisis["venta total con iva"] = df_analisis["Total Línea"]
-            
+
             df_analisis["utilidad total"] = (df_analisis["Util $ (Uni)"] * df_analisis["Pzas"]).round(2)
 
             cols_finales = [
@@ -2620,7 +2619,6 @@ elif st.session_state.menu_actual == 'nuevo':
                 "venta total sin iva", "venta total con iva",
                 "utilidad total"
             ]
-
             def aplicar_estilo_financiero(styler):
                 # Costos Proveedor (Verde)
                 styler.set_properties(subset=["Costo unit. prod.prov. sin iva", "Costo unit. prod. prov. con iva", "total prov sin iva", "total prov con iva"], 
