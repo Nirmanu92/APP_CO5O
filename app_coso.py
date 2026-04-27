@@ -1989,10 +1989,10 @@ elif st.session_state.menu_actual == 'menu':
                 ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
                 df_resumen = pd.DataFrame(ws_res.get_all_records())
             
-            ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
-            df_det_all = pd.DataFrame(ws_det.get_all_records())
+                ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
+                df_det_all = pd.DataFrame(ws_det.get_all_records())
             
-            if not df_resumen.empty:
+                if not df_resumen.empty:
                 col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
                 col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
 
