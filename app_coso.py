@@ -2321,8 +2321,31 @@ elif st.session_state.menu_actual == 'pedido':
                     ws_p = gc.open_by_key(ID_SHEET_PEDIDOS).sheet1
                     folio_actual = st.session_state.folio_val
 
+                    # --- ASEGURAR COLUMNAS DE CÁLCULO PARA EL PDF TÉCNICO ---
                     df_p_final = df_p_actual.copy()
-                    # (Cálculos y subida a Drive se mantienen...)
+                    db_prov = st.session_state.get('proveedores_db', [])
+                    mapa_iva = {p['PROVEEDOR']: (1.0 if p.get('SUMA_IVA', 'SI') == 'SI' else 1.16) for p in db_prov}
+                    tc = st.session_state.get('tc_val', 1.0)
+                    moneda_cot = st.session_state.get('moneda_val', 'MXN')
+
+                    def conv(precio, moneda_item):
+                        if moneda_cot == "MXN" and moneda_item == "USD": return precio * tc
+                        if moneda_cot == "USD" and moneda_item == "MXN": return precio / tc
+                        return precio
+
+                    # Inyectar cálculos si no existen (viniendo del editor)
+                    if "Costo (Sub)" not in df_p_final.columns:
+                        df_p_final["PM_C"] = df_p_final.apply(lambda r: conv(r.get("PM", 0), r.get("Moneda", "MXN")), axis=1)
+                        df_p_final["Envio_P_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Prov", 0), r.get("Moneda", "MXN")), axis=1)
+                        df_p_final["Envio_S_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Sec", 0), r.get("Moneda", "MXN")), axis=1)
+                        divs = df_p_final["Proveedor"].map(mapa_iva).fillna(1.0)
+                        
+                        df_p_final["Costo (Sub)"] = (df_p_final["PM_C"] / divs) + df_p_final["Envio_P_C"]
+                        df_p_final["Envio Sec"] = df_p_final["Envio_S_C"]
+                        df_p_final["Venta (Sub)"] = (df_p_final["Costo (Sub)"] + df_p_final["Envio Sec"]) * (1 + (df_p_final.get("Util %", 15) / 100))
+                        df_p_final["Venta (IVA)"] = df_p_final["Venta (Sub)"] * 1.16
+
+                    # Subir archivos a Drive
                     l_pago = subir_archivo_a_drive(file_respaldo.read(), f"PAGO_{folio_actual}.pdf") if file_respaldo else ""
                     l_csf = subir_archivo_a_drive(file_csf.read(), f"CSF_{folio_actual}.pdf") if file_csf else ""
 
