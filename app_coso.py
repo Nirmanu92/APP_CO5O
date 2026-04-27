@@ -2592,48 +2592,52 @@ elif st.session_state.menu_actual == 'nuevo':
             df_analisis["Total Línea"] = (df_analisis["Venta (IVA)"] * df_analisis["Pzas"]).round(2)
 
             st.write("Análisis Detallado de Partidas")
-            st.dataframe(df_analisis, use_container_width=True, hide_index=True)
+            
+            # --- DESGLOSE FINANCIERO MAESTRO ---
+            df_analisis["Costo unit. prod.prov. sin iva"] = df_analisis["Costo (Sub)"]
+            df_analisis["Costo unit. prod. prov. con iva"] = df_analisis["Costo (IVA)"]
+            df_analisis["total prov sin iva"] = (df_analisis["Costo (Sub)"] * df_analisis["Pzas"]).round(2)
+            df_analisis["total prov con iva"] = (df_analisis["Costo (IVA)"] * df_analisis["Pzas"]).round(2)
+            df_analisis["Envío Local (Unit)"] = df_analisis["Envio Sec"]
+            df_analisis["Envío Local (Total)"] = (df_analisis["Envio Sec"] * df_analisis["Pzas"]).round(2)
+            
+            df_analisis["venta unitaria sin iva"] = df_analisis["Venta (Sub)"]
+            df_analisis["venta unitaria con iva"] = df_analisis["Venta (IVA)"]
+            df_analisis["venta total sin iva"] = (df_analisis["Venta (Sub)"] * df_analisis["Pzas"]).round(2)
+            df_analisis["venta total con iva"] = df_analisis["Total Línea"]
+            
+            df_analisis["utilidad total"] = (df_analisis["Util $ (Uni)"] * df_analisis["Pzas"]).round(2)
 
-                    df_analisis["Envío Local (Total)"] = (df_analisis["Envio Sec"] * df_analisis["Pzas"]).round(2)
-                    
-                    df_analisis["venta unitaria sin iva"] = df_analisis["Venta (Sub)"]
-                    df_analisis["venta unitaria con iva"] = df_analisis["Venta (IVA)"]
-                    df_analisis["venta total sin iva"] = (df_analisis["Venta (Sub)"] * df_analisis["Pzas"]).round(2)
-                    df_analisis["venta total con iva"] = df_analisis["Total Línea"]
-                    
-                    df_analisis["utilidad total"] = (df_analisis["Util $ (Uni)"] * df_analisis["Pzas"]).round(2)
+            cols_finales = [
+                "Concepto", "Pzas",
+                "Costo unit. prod.prov. sin iva", "Costo unit. prod. prov. con iva", 
+                "total prov sin iva", "total prov con iva",
+                "Envío Local (Unit)", "Envío Local (Total)",
+                "venta unitaria sin iva", "venta unitaria con iva", 
+                "venta total sin iva", "venta total con iva",
+                "utilidad total"
+            ]
 
-                    cols_finales = [
-                        "Concepto", "Pzas",
-                        "Costo unit. prod.prov. sin iva", "Costo unit. prod. prov. con iva", 
-                        "total prov sin iva", "total prov con iva",
-                        "Envío Local (Unit)", "Envío Local (Total)",
-                        "venta unitaria sin iva", "venta unitaria con iva", 
-                        "venta total sin iva", "venta total con iva",
-                        "utilidad total"
-                    ]
+            def aplicar_estilo_financiero(styler):
+                # Costos Proveedor (Verde)
+                styler.set_properties(subset=["Costo unit. prod.prov. sin iva", "Costo unit. prod. prov. con iva", "total prov sin iva", "total prov con iva"], 
+                                    **{'background-color': '#1B5E20', 'color': 'white'})
+                # Envío (Gris oscuro)
+                styler.set_properties(subset=["Envío Local (Unit)", "Envío Local (Total)"], 
+                                    **{'background-color': '#424242', 'color': 'white'})
+                # Ventas (Amarillo)
+                styler.set_properties(subset=["venta unitaria sin iva", "venta unitaria con iva", "venta total sin iva", "venta total con iva"], 
+                                    **{'background-color': '#FBC02D', 'color': 'black'})
+                # Utilidad (Morado)
+                styler.set_properties(subset=["utilidad total"], 
+                                    **{'background-color': '#4A148C', 'color': 'white'})
+                return styler
 
-                    def aplicar_estilo_financiero(styler):
-                        # Costos Proveedor (Verde)
-                        styler.set_properties(subset=["Costo unit. prod.prov. sin iva", "Costo unit. prod. prov. con iva", "total prov sin iva", "total prov con iva"], 
-                                            **{'background-color': '#1B5E20', 'color': 'white'})
-                        # Envío (Gris oscuro para separar)
-                        styler.set_properties(subset=["Envío Local (Unit)", "Envío Local (Total)"], 
-                                            **{'background-color': '#424242', 'color': 'white'})
-                        # Ventas (Amarillo)
-                        styler.set_properties(subset=["venta unitaria sin iva", "venta unitaria con iva", "venta total sin iva", "venta total con iva"], 
-                                            **{'background-color': '#FBC02D', 'color': 'black'})
-                        # Utilidad (Morado)
-                        styler.set_properties(subset=["utilidad total"], 
-                                            **{'background-color': '#4A148C', 'color': 'white'})
-                        return styler
-
-                    st.write("Análisis Detallado de Partidas")
-                    st.dataframe(
-                        df_analisis[cols_finales].style.pipe(aplicar_estilo_financiero).format(precision=2, thousands=",", decimal="."),
-                        use_container_width=True, 
-                        hide_index=True
-                    )
+            st.dataframe(
+                df_analisis[cols_finales].style.pipe(aplicar_estilo_financiero).format(precision=2, thousands=",", decimal="."),
+                use_container_width=True, 
+                hide_index=True
+            )
 
             with tab3:
                 st.subheader("Fotografías de Productos")
