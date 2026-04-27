@@ -2328,7 +2328,14 @@ elif st.session_state.menu_actual == 'pedido':
 
                     p_final_str = f"{pago_cliente} ({dias_credito if pago_cliente=='Linea de crédito' else vigencia_fin})"
 
-                    pdf_t = generar_pedido_tecnico_blob_v2({"folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, "cliente": cliente_actual, "pago": p_final_str}, df_p_final, {"rfc": rfc_f, "razon_fiscal": razon_f}, {"dir_entrega": dir_ent, "persona_recibe": persona_rec}, {}, detalles_compra)
+                    pdf_t = generar_pedido_tecnico_blob_v2(
+                        {"folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, "cliente": cliente_actual, "pago": p_final_str}, 
+                        df_p_final, 
+                        {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p}, 
+                        {"dir_entrega": dir_ent, "persona_recibe": persona_rec}, 
+                        {}, 
+                        detalles_compra
+                    )
                     l_pdf = subir_archivo_a_drive(pdf_t, f"PEDIDO_{folio_actual}.pdf")
 
                     def guardar_fila_inteligente(ws, datos_dict):
