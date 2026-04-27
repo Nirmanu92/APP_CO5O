@@ -1225,19 +1225,32 @@ def cargar_datos_sesion_usuario():
 
                 # 1. Intentar en Archivo Central (PRIORIDAD PARA TERMINOS)
                 if nombre_ws == "TERMINOS" or nombre_ws == "PROVEEDORES":
-                    archivos_centrales = ["TERMINOS_Y_CONDICIONES", "TERMINOS Y CONDICIONES", "MAESTRO_CO5O"]
-                    if nombre_ws == "PROVEEDORES": archivos_centrales = ["PROVEEDORES_MAESTRO", "MAESTRO_CO5O", "PROVEEDORES"]
+                    # Intentar por ID directo primero (si es conocido) o por nombre
+                    archivos_centrales = [
+                        ("1YJWY1C2OYpGypTyYWrXJRIZTU9jFwC_cvBwLNp2aQDE", "TERMINOS_Y_CONDICIONES"), # ID del Maestro de Pedidos como respaldo si están ahí
+                        (None, "TERMINOS_Y_CONDICIONES"),
+                        (None, "TERMINOS Y CONDICIONES"),
+                        (None, "MAESTRO_CO5O")
+                    ]
                     
-                    for file_name in archivos_centrales:
+                    for f_id, f_name in archivos_centrales:
                         try:
-                            sh_m = gc.open(file_name)
-                            for ws_name in [nombre_ws, "TERMINOS", "PROVEEDORES", "Hoja1", "HOJA1"]:
+                            if f_id: sh_m = gc.open_by_key(f_id)
+                            else: sh_m = gc.open(f_name)
+                            
+                            for ws_name in [nombre_ws, "TERMINOS", "PROVEEDORES", "Hoja1", "HOJA1", "Sheet1"]:
                                 try:
                                     ws_m = sh_m.worksheet(ws_name)
                                     recs = ws_m.get_all_records()
-                                    if recs: return normalizar_registros(recs)
+                                    if recs: 
+                                        data_norm = normalizar_registros(recs)
+                                        if data_norm: return data_norm
                                 except: continue
                         except: continue
+                    
+                    # Si falla todo para TERMINOS, avisar al usuario
+                    if nombre_ws == "TERMINOS":
+                        st.session_state.error_maestro_terminos = True
 
                 # 2. Intentar en hoja personal
                 if st.session_state.sh_personal:
