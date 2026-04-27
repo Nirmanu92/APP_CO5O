@@ -1225,12 +1225,11 @@ def cargar_datos_sesion_usuario():
 
                 # 1. Intentar en Archivo Central (PRIORIDAD PARA TERMINOS)
                 if nombre_ws == "TERMINOS" or nombre_ws == "PROVEEDORES":
-                    # Intentar por ID directo primero (si es conocido) o por nombre
+                    # Usar el ID específico proporcionado por el usuario
                     archivos_centrales = [
-                        ("1YJWY1C2OYpGypTyYWrXJRIZTU9jFwC_cvBwLNp2aQDE", "TERMINOS_Y_CONDICIONES"), # ID del Maestro de Pedidos como respaldo si están ahí
-                        (None, "TERMINOS_Y_CONDICIONES"),
-                        (None, "TERMINOS Y CONDICIONES"),
-                        (None, "MAESTRO_CO5O")
+                        ("14W4fYj-9_mAcic2XDDWx1XGNh38xlBCZRFA_AUhrc0s", "TERMINOS_Y_CONDICIONES"),
+                        ("1YJWY1C2OYpGypTyYWrXJRIZTU9jFwC_cvBwLNp2aQDE", "MAESTRO_CO5O"),
+                        (None, "TERMINOS_Y_CONDICIONES")
                     ]
                     
                     for f_id, f_name in archivos_centrales:
