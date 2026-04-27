@@ -2483,171 +2483,117 @@ elif st.session_state.menu_actual == 'nuevo':
         with col_e3:
             mail_e = st.text_input("Email:", value=v_mail)
 
-                st.divider()
-                col_c1, col_c2 = st.columns(2)
-                with col_c1:
-                    lista_rs = sorted(list(set([c.get('RAZON_SOCIAL') for c in st.session_state.directorio if c.get('RAZON_SOCIAL')])))
-                    opciones_rs = ["Seleccionar..."] + lista_rs
-                    val_rs_actual = st.session_state.get('cliente_sel', 'Seleccionar...')
-                    idx_rs = opciones_rs.index(val_rs_actual) if val_rs_actual in opciones_rs else 0
-                    cliente_sel = st.selectbox("Razón Social:", opciones_rs, index=idx_rs, key="rs_sel_final")
-                    st.session_state.cliente_sel = cliente_sel
-                
-                with col_c2:
-                    if cliente_sel != "Seleccionar...":
-                        contactos = sorted(list(set([c.get('CONTACTO') for c in st.session_state.directorio if c.get('RAZON_SOCIAL') == cliente_sel and c.get('CONTACTO')])))
-                        opciones_c = ["Seleccionar..."] + contactos
-                        val_c_actual = st.session_state.get('contacto_sel', 'Seleccionar...')
-                        idx_c = opciones_c.index(val_c_actual) if val_c_actual in opciones_c else 0
-                        contacto_sel = st.selectbox("Atención a:", opciones_c, index=idx_c, key="cont_sel_final")
-                        st.session_state.contacto_sel = contacto_sel
-                    else:
-                        st.selectbox("Atención a:", ["Seleccionar..."], disabled=True, key="cont_dis")
-                        contacto_sel = "Seleccionar..."
+        st.divider()
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            lista_rs = sorted(list(set([c.get('RAZON_SOCIAL') for c in st.session_state.directorio if c.get('RAZON_SOCIAL')])))
+            opciones_rs = ["Seleccionar..."] + lista_rs
+            val_rs_actual = st.session_state.get('cliente_sel', 'Seleccionar...')
+            idx_rs = opciones_rs.index(val_rs_actual) if val_rs_actual in opciones_rs else 0
+            cliente_sel = st.selectbox("Razón Social:", opciones_rs, index=idx_rs, key="rs_sel_final")
+            st.session_state.cliente_sel = cliente_sel
+        
+        with col_c2:
+            if cliente_sel != "Seleccionar...":
+                contactos = sorted(list(set([c.get('CONTACTO') for c in st.session_state.directorio if c.get('RAZON_SOCIAL') == cliente_sel and c.get('CONTACTO')])))
+                opciones_c = ["Seleccionar..."] + contactos
+                val_c_actual = st.session_state.get('contacto_sel', 'Seleccionar...')
+                idx_c = opciones_c.index(val_c_actual) if val_c_actual in opciones_c else 0
+                contacto_sel = st.selectbox("Atención a:", opciones_c, index=idx_c, key="cont_sel_final")
+                st.session_state.contacto_sel = contacto_sel
+            else:
+                st.selectbox("Atención a:", ["Seleccionar..."], disabled=True, key="cont_dis")
+                contacto_sel = "Seleccionar..."
 
-                # --- LÓGICA DE FOLIO SÚPER-DIRECTA (SIN CALLBACKS) ---
-                if cliente_sel != "Seleccionar..." and ejecutivo_nom != "Seleccionar...":
-                    # Detectar si el cliente o el ejecutivo cambiaron para regenerar folio automáticamente
-                    cambio_cliente = st.session_state.get("ultimo_cliente_folio") != cliente_sel
-                    cambio_ejecutivo = st.session_state.get("ultimo_ejecutivo_folio") != ejecutivo_nom
-                    
-                    if not st.session_state.get("folio_val") or cambio_cliente or cambio_ejecutivo:
-                        # Solo generar automáticamente si no estamos en modo edición de una cotización existente
-                        if "folio_original_edicion" not in st.session_state:
-                            ej_id = next((u["USUARIO"] for u in st.session_state.usuarios_db if u["NOMBRE"] == ejecutivo_nom), st.session_state.usuario)
-                            nuevo_f = generar_folio_automatico(cliente_sel, ej_id)
-                            if nuevo_f:
-                                st.session_state.folio_val = nuevo_f
-                                st.session_state.folio_widget_input = nuevo_f  # Actualizar widget directamente
-                                st.session_state.ultimo_cliente_folio = cliente_sel
-                                st.session_state.ultimo_ejecutivo_folio = ejecutivo_nom
-                                st.rerun()  # Forzar recarga para mostrar el folio generado
+        # --- LÓGICA DE FOLIO SÚPER-DIRECTA ---
+        if cliente_sel != "Seleccionar..." and ejecutivo_nom != "Seleccionar...":
+            cambio_cliente = st.session_state.get("ultimo_cliente_folio") != cliente_sel
+            cambio_ejecutivo = st.session_state.get("ultimo_ejecutivo_folio") != ejecutivo_nom
+            if not st.session_state.get("folio_val") or cambio_cliente or cambio_ejecutivo:
+                if "folio_original_edicion" not in st.session_state:
+                    ej_id = next((u["USUARIO"] for u in st.session_state.usuarios_db if u["NOMBRE"] == ejecutivo_nom), st.session_state.usuario)
+                    nuevo_f = generar_folio_automatico(cliente_sel, ej_id)
+                    if nuevo_f:
+                        st.session_state.folio_val = nuevo_f
+                        st.session_state.folio_widget_input = nuevo_f
+                        st.session_state.ultimo_cliente_folio = cliente_sel
+                        st.session_state.ultimo_ejecutivo_folio = ejecutivo_nom
+                        st.rerun()
 
-                st.divider()
-                col_f1, col_f2, col_f3, col_f4 = st.columns([1.5, 1, 1, 1])
-                with col_f1:
-                    # Mostramos el folio calculado o lo que el usuario escriba
-                    folio_input = st.text_input("Folio de Cotización:", value=st.session_state.get('folio_val', ""), key="folio_widget_input")
-                    st.session_state.folio_val = folio_input
-                
-                with col_f2:
-                    moneda_opciones = ["MXN", "USD"]
-                    val_mon_actual = st.session_state.get('moneda_val', 'MXN')
-                    idx_m = moneda_opciones.index(val_mon_actual) if val_mon_actual in moneda_opciones else 0
-                    moneda = st.selectbox("Moneda Cotización:", moneda_opciones, index=idx_m, key="mon_sel_final")
-                    st.session_state.moneda_val = moneda
+        st.divider()
+        col_f1, col_f2, col_f3, col_f4 = st.columns([1.5, 1, 1, 1])
+        with col_f1:
+            folio_input = st.text_input("Folio de Cotización:", value=st.session_state.get('folio_val', ""), key="folio_widget_input")
+            st.session_state.folio_val = folio_input
+        with col_f2:
+            moneda_opciones = ["MXN", "USD"]
+            val_mon_actual = st.session_state.get('moneda_val', 'MXN')
+            idx_m = moneda_opciones.index(val_mon_actual) if val_mon_actual in moneda_opciones else 0
+            st.session_state.moneda_val = st.selectbox("Moneda Cotización:", moneda_opciones, index=idx_m, key="mon_sel_final")
+        with col_f3:
+            st.session_state.tc_val = st.number_input("Tipo de Cambio:", value=st.session_state.get('tc_val', 18.00), format="%.2f", key="tc_val_input")
+        with col_f4:
+            st.session_state.vigencia_val = st.date_input("Vigencia:", value=st.session_state.get('vigencia_val', date.today()), key="vigencia_val_d")
 
-                with col_f3:
-                    # Mostrar TC solo si la cotización es MXN o si hay costos en USD (siempre visible es más seguro)
-                    val_tc = st.session_state.get('tc_val', 18.00)
-                    tc = st.number_input("Tipo de Cambio:", value=val_tc, format="%.2f", key="tc_val_input")
-                    st.session_state.tc_val = tc
+    with tab2:
+        st.subheader("Análisis de Partidas")
+        db_prov = st.session_state.get('proveedores_db', [])
+        lista_prov = [p['PROVEEDOR'] for p in db_prov]
+        mapa_iva = {p['PROVEEDOR']: (1.0 if p.get('SUMA_IVA', 'SI') == 'SI' else 1.16) for p in db_prov}
 
-                with col_f4:
-                    val_vigencia = st.session_state.get('vigencia_val', date.today())
-                    vigencia = st.date_input("Vigencia:", value=val_vigencia, key="vigencia_val")
+        if 'df_partidas' not in st.session_state:
+            st.session_state.df_partidas = pd.DataFrame([{
+                "Tipo": "PARTIDA", "Moneda": "MXN", "Concepto": "", "Descripción": "", "Pzas": 1, "SKU": "",
+                "PM": 0.0, "Proveedor": lista_prov[0] if lista_prov else "", 
+                "Folio Prov": "", "Link": "",
+                "Envio Prov": 0.0, "Envio Sec": 0.0, "Util %": 15.0,
+                "Financiamiento": "Sin Financiera", "Financiera": "N/A"
+            }])
 
-                st.divider()
-                col_t1, col_t2, col_t3 = st.columns(3)
-                
-                # Función para extraer columna de forma robusta
-                def ext_col(db, key_pref):
-                    if not db: return []
-                    keys = list(db[0].keys())
-                    # Buscar coincidencia exacta o parcial ignorando mayúsculas y espacios
-                    match = next((k for k in keys if key_pref.upper() in k.upper().replace(" ", "_")), None)
-                    if match: 
-                        # Extraer valores, quitar vacíos y duplicados, y ordenar
-                        vals = [str(t[match]) for t in db if t.get(match)]
-                        return sorted(list(set(vals)))
-                    return []
+        config_editor = {
+            "Tipo": st.column_config.SelectboxColumn("Tipo", options=["PARTIDA", "COMPONENTE"], required=True),
+            "Moneda": st.column_config.SelectboxColumn("Moneda", options=["MXN", "USD"], required=True),
+            "Descripción": st.column_config.TextColumn("Descripción", width="medium", required=True),
+            "PM": st.column_config.NumberColumn("P. Mayorista", format="$ %.2f"),
+            "Proveedor": st.column_config.SelectboxColumn("Proveedor", options=lista_prov),
+            "Util %": st.column_config.NumberColumn("Margen %", format="%.1f%%"),
+            "Pzas": st.column_config.NumberColumn("Cant", min_value=1),
+            "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True),
+            "Financiera": st.column_config.SelectboxColumn("Financiera", options=["N/A", "DFS", "HPE", "Otro"], required=True),
+        }
 
-                with col_t1:
-                    opciones_entrega = ext_col(st.session_state.terminos_db, "ENTREGA")
-                    full_entrega = ["Seleccionar..."] + opciones_entrega
-                    idx_e = buscar_index(full_entrega, st.session_state.get('entrega_val'))
-                    entrega = st.selectbox("Entrega:", full_entrega, index=idx_e, key="entrega_val_sel")
-                    st.session_state.entrega_val = entrega
-                with col_t2:
-                    opciones_pago = ext_col(st.session_state.terminos_db, "PAGO")
-                    full_pago = ["Seleccionar..."] + opciones_pago
-                    idx_p = buscar_index(full_pago, st.session_state.get('pago_val'))
-                    pago = st.selectbox("Pago:", full_pago, index=idx_p, key="pago_val_sel")
-                    st.session_state.pago_val = pago
-                with col_t3:
-                    opciones_cond = ext_col(st.session_state.terminos_db, "CONDICIONES")
-                    full_cond = ["Seleccionar..."] + opciones_cond
-                    idx_c = buscar_index(full_cond, st.session_state.get('condic_val'))
-                    condic = st.selectbox("Condiciones Especiales:", full_cond, index=idx_c, key="condic_val_sel")
-                    st.session_state.condic_val = condic
-                
-                # Comentarios eliminados de aquí (se movieron a Finalizar)
+        key_dinamica = f"editor_{st.session_state.get('editor_key', 0)}"
+        editado = st.data_editor(st.session_state.df_partidas, column_config=config_editor, num_rows="dynamic", use_container_width=True, key=key_dinamica)
 
-            with tab2:
-                st.subheader("Análisis de Partidas")
-                # Lógica del editor (se mantiene igual, solo dentro del tab)
-                db_prov = st.session_state.get('proveedores_db', [])
-                lista_prov = [p['PROVEEDOR'] for p in db_prov]
-                mapa_iva = {p['PROVEEDOR']: (1.0 if p.get('SUMA_IVA', 'SI') == 'SI' else 1.16) for p in db_prov}
+        if editado is not None and not editado.empty:
+            df_analisis = editado.copy()
+            for col in ["PM", "Pzas", "Util %", "Envio Prov", "Envio Sec"]:
+                if col in df_analisis.columns: df_analisis[col] = pd.to_numeric(df_analisis[col], errors='coerce').fillna(0)
 
-                if 'df_partidas' not in st.session_state:
-                    st.session_state.df_partidas = pd.DataFrame([{
-                        "Tipo": "PARTIDA", "Moneda": "MXN", "Concepto": "", "Descripción": "", "Pzas": 1, "SKU": "",
-                        "PM": 0.0, "Proveedor": lista_prov[0] if lista_prov else "", 
-                        "Folio Prov": "", "Link": "",
-                        "Envio Prov": 0.0, "Envio Sec": 0.0, "Util %": 15.0,
-                        "Financiamiento": "Sin Financiera", "Financiera": "N/A"
-                    }])
+            tc = st.session_state.get('tc_val', 1.0)
+            moneda_cot = st.session_state.get('moneda_val', 'MXN')
 
-                config_editor = {
-                    "Tipo": st.column_config.SelectboxColumn("Tipo", options=["PARTIDA", "COMPONENTE"], required=True),
-                    "Moneda": st.column_config.SelectboxColumn("Moneda", options=["MXN", "USD"], required=True),
-                    "Descripción": st.column_config.TextColumn("Descripción", width="medium", required=True),
-                    "PM": st.column_config.NumberColumn("P. Mayorista", format="$ %.2f"),
-                    "Proveedor": st.column_config.SelectboxColumn("Proveedor", options=lista_prov),
-                    "Util %": st.column_config.NumberColumn("Margen %", format="%.1f%%"),
-                    "Pzas": st.column_config.NumberColumn("Cant", min_value=1),
-                    "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True),
-                    "Financiera": st.column_config.SelectboxColumn("Financiera", options=["N/A", "DFS", "HPE", "Otro"], required=True),
-                }
+            def normalizar_a_cotizacion(precio, moneda_item):
+                if moneda_cot == "MXN" and moneda_item == "USD": return precio * tc
+                if moneda_cot == "USD" and moneda_item == "MXN": return precio / tc
+                return precio
 
-                key_dinamica = f"editor_{st.session_state.get('editor_key', 0)}"
-                editado = st.data_editor(st.session_state.df_partidas, column_config=config_editor, num_rows="dynamic", use_container_width=True, key=key_dinamica)
+            df_analisis["PM_CONV"] = df_analisis.apply(lambda r: normalizar_a_cotizacion(r["PM"], r.get("Moneda", "MXN")), axis=1)
+            df_analisis["Envio_P_CONV"] = df_analisis.apply(lambda r: normalizar_a_cotizacion(r["Envio Prov"], r.get("Moneda", "MXN")), axis=1)
+            df_analisis["Envio_S_CONV"] = df_analisis.apply(lambda r: normalizar_a_cotizacion(r["Envio Sec"], r.get("Moneda", "MXN")), axis=1)
 
-                if editado is not None and not editado.empty:
-                    df_analisis = editado.copy()
-                    for col in ["PM", "Pzas", "Util %", "Envio Prov", "Envio Sec"]:
-                        if col in df_analisis.columns: df_analisis[col] = pd.to_numeric(df_analisis[col], errors='coerce').fillna(0)
+            divisores = df_analisis["Proveedor"].map(mapa_iva).fillna(1.0)
+            df_analisis["Costo (Sub)"] = ((df_analisis["PM_CONV"] / divisores) + df_analisis["Envio_P_CONV"]).round(2)
+            df_analisis["Costo (IVA)"] = (df_analisis["Costo (Sub)"] * 1.16).round(2)
+            costo_final_v = df_analisis["Costo (Sub)"] + df_analisis["Envio_S_CONV"]
+            df_analisis["Venta (Sub)"] = (costo_final_v * (1 + (df_analisis["Util %"] / 100))).round(2)
+            df_analisis["Venta (IVA)"] = (df_analisis["Venta (Sub)"] * 1.16).round(2)
+            df_analisis["Util $ (Uni)"] = (df_analisis["Venta (Sub)"] - costo_final_v).round(2)
+            df_analisis["Total Línea"] = (df_analisis["Venta (IVA)"] * df_analisis["Pzas"]).round(2)
 
-                    # --- LÓGICA DE CONVERSIÓN MULTIMONEDA ---
-                    tc = st.session_state.get('tc_val', 1.0)
-                    moneda_cot = st.session_state.get('moneda_val', 'MXN')
+            st.write("Análisis Detallado de Partidas")
+            st.dataframe(df_analisis, use_container_width=True, hide_index=True)
 
-                    def normalizar_a_cotizacion(precio, moneda_item):
-                        if moneda_cot == "MXN" and moneda_item == "USD": return precio * tc
-                        if moneda_cot == "USD" and moneda_item == "MXN": return precio / tc
-                        return precio
-
-                    # Aplicar conversión a PM y Envíos antes del cálculo
-                    df_analisis["PM_CONV"] = df_analisis.apply(lambda r: normalizar_a_cotizacion(r["PM"], r.get("Moneda", "MXN")), axis=1)
-                    df_analisis["Envio_P_CONV"] = df_analisis.apply(lambda r: normalizar_a_cotizacion(r["Envio Prov"], r.get("Moneda", "MXN")), axis=1)
-                    df_analisis["Envio_S_CONV"] = df_analisis.apply(lambda r: normalizar_a_cotizacion(r["Envio Sec"], r.get("Moneda", "MXN")), axis=1)
-
-                    divisores = df_analisis["Proveedor"].map(mapa_iva).fillna(1.0)
-                    df_analisis["Costo (Sub)"] = ((df_analisis["PM_CONV"] / divisores) + df_analisis["Envio_P_CONV"]).round(2)
-                    df_analisis["Costo (IVA)"] = (df_analisis["Costo (Sub)"] * 1.16).round(2)
-                    costo_final_v = df_analisis["Costo (Sub)"] + df_analisis["Envio_S_CONV"]
-                    df_analisis["Venta (Sub)"] = (costo_final_v * (1 + (df_analisis["Util %"] / 100))).round(2)
-                    df_analisis["Venta (IVA)"] = (df_analisis["Venta (Sub)"] * 1.16).round(2)
-                    df_analisis["Util $ (Uni)"] = (df_analisis["Venta (Sub)"] - costo_final_v).round(2)
-                    df_analisis["Total Línea"] = (df_analisis["Venta (IVA)"] * df_analisis["Pzas"]).round(2)
-
-                    # --- DESGLOSE FINANCIERO MAESTRO ---
-                    df_analisis["Costo unit. prod.prov. sin iva"] = df_analisis["Costo (Sub)"]
-                    df_analisis["Costo unit. prod. prov. con iva"] = df_analisis["Costo (IVA)"]
-                    df_analisis["total prov sin iva"] = (df_analisis["Costo (Sub)"] * df_analisis["Pzas"]).round(2)
-                    df_analisis["total prov con iva"] = (df_analisis["Costo (IVA)"] * df_analisis["Pzas"]).round(2)
-                    df_analisis["Envío Local (Unit)"] = df_analisis["Envio Sec"]
                     df_analisis["Envío Local (Total)"] = (df_analisis["Envio Sec"] * df_analisis["Pzas"]).round(2)
                     
                     df_analisis["venta unitaria sin iva"] = df_analisis["Venta (Sub)"]
