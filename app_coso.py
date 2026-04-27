@@ -1224,10 +1224,26 @@ def cargar_datos_sesion_usuario():
                     return res
 
                 # 1. Intentar en Archivo Central (PRIORIDAD PARA TERMINOS)
-                if nombre_ws == "TERMINOS" or nombre_ws == "PROVEEDORES":
+                if nombre_ws == "TERMINOS":
+                    try:
+                        sh_m = gc.open_by_key("14W4fYj-9_mAcic2XDDWx1XGNh38xlBCZRFA_AUhrc0s")
+                        ws_m = sh_m.worksheet("Hoja 1")
+                        vals = ws_m.get_all_values()
+                        if vals:
+                            res = []
+                            for r_idx in range(1, len(vals)):
+                                fila = vals[r_idx]
+                                d = {}
+                                if len(fila) > 0 and fila[0].strip(): d['ENTREGA'] = fila[0].strip()
+                                if len(fila) > 1 and fila[1].strip(): d['PAGO'] = fila[1].strip()
+                                if len(fila) > 2 and fila[2].strip(): d['CONDICIONES'] = fila[2].strip()
+                                if d: res.append(d)
+                            if res: return res
+                    except: pass
+
+                if nombre_ws == "PROVEEDORES" or (nombre_ws == "TERMINOS" and 'res' not in locals()):
                     # Usar el ID específico proporcionado por el usuario
                     archivos_centrales = [
-                        ("14W4fYj-9_mAcic2XDDWx1XGNh38xlBCZRFA_AUhrc0s", "TERMINOS_Y_CONDICIONES"),
                         ("1YJWY1C2OYpGypTyYWrXJRIZTU9jFwC_cvBwLNp2aQDE", "MAESTRO_CO5O"),
                         (None, "TERMINOS_Y_CONDICIONES")
                     ]
