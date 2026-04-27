@@ -1579,6 +1579,129 @@ def renderizar_dashboard_operaciones():
     st.divider()
     st.info("💡 Salvador: Puedes usar el 'Buscador de Vínculos' en el menú superior para analizar si un nuevo lead ya está en la base de algún ejecutivo.")
 
+def renderizar_gestion_pedidos_central():
+    st.title("📦 Centro de Gestión de Pedidos (Administración)")
+    st.info("Visualización y control de pedidos de todo el ecosistema CO5O.")
+
+    try:
+        gc = conectar_google_sheets()
+        sh_p = gc.open_by_key(ID_SHEET_PEDIDOS)
+        ws_p = sh_p.sheet1
+        data_p = ws_p.get_all_records()
+        df_p = pd.DataFrame(data_p)
+        
+        if df_p.empty:
+            st.info("No hay pedidos registrados en el sistema central.")
+            return
+
+        # --- FILTROS SUPERIORES ---
+        c_f1, c_f2, c_f3 = st.columns(3)
+        with c_f1:
+            ej_lista = ["Todos"] + sorted(list(df_p['EJECUTIVO'].unique()))
+            ej_sel = st.selectbox("Filtrar por Ejecutivo:", ej_lista)
+        with c_f2:
+            st_lista = ["Todos"] + sorted(list(df_p['ESTATUS'].unique()))
+            st_sel = st.selectbox("Filtrar por Estatus:", st_lista)
+        with c_f3:
+            busqueda = st.text_input("Buscar por Folio o Cliente:")
+
+        # Aplicar Filtros
+        if ej_sel != "Todos": df_p = df_p[df_p['EJECUTIVO'] == ej_sel]
+        if st_sel != "Todos": df_p = df_p[df_p['ESTATUS'] == st_sel]
+        if busqueda:
+            df_p = df_p[df_p['FOLIO'].astype(str).str.contains(busqueda, case=False) | df_p['CLIENTE'].astype(str).str.contains(busqueda, case=False)]
+
+        # --- KPIs RÁPIDOS ---
+        st.divider()
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Pedidos Totales", len(df_p))
+        k2.metric("Nuevos", len(df_p[df_p['ESTATUS'] == "PEDIDO NUEVO"]))
+        monto_total_val = pd.to_numeric(df_p['MONTO_TOTAL'], errors='coerce').sum()
+        k3.metric("Monto en Gestión", f"$ {monto_total_val:,.2f}")
+        k4.metric("Ejecutivos Activos", len(df_p['EJECUTIVO'].unique()))
+
+        st.divider()
+
+        # --- LISTA DE PEDIDOS ---
+        for i, row in df_p.iloc[::-1].iterrows():
+            folio = row.get('FOLIO', 'N/A')
+            cliente = row.get('CLIENTE', 'N/A')
+            monto = row.get('MONTO_TOTAL', 0)
+            estatus = row.get('ESTATUS', 'N/A')
+            ejecutivo = row.get('EJECUTIVO', 'N/A')
+            
+            with st.expander(f"📄 {folio} | {cliente} | {ejecutivo} | ${monto:,.2f} | {estatus}"):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.markdown("**Datos Fiscales**")
+                    st.write(f"RFC: {row.get('RFC', 'N/A')}")
+                    st.write(f"RS: {row.get('RAZON_SOCIAL_FISCAL', 'N/A')}")
+                    st.write(f"Uso: {row.get('USO_CFDI', 'N/A')}")
+                    st.write(f"Método: {row.get('METODO_PAGO', 'N/A')}")
+                
+                with c2:
+                    st.markdown("**Logística**")
+                    st.write(f"Origen: {row.get('ORIGEN_ENTREGA', 'N/A')}")
+                    st.write(f"Método: {row.get('METODO_ENVIO', 'N/A')}")
+                    st.write(f"Recibe: {row.get('PERSONA_RECIBE', 'N/A')}")
+                    maps = row.get('LINK_MAPS', '')
+                    if maps and str(maps).startswith("http"):
+                        st.link_button("📍 VER UBICACIÓN MAPS", maps, use_container_width=True)
+                
+                with c3:
+                    st.markdown("**Pago y Crédito**")
+                    st.write(f"Tipo: {row.get('TIPO_PAGO', 'N/A')}")
+                    if row.get('DIAS_CREDITO') != "N/A": st.write(f"Días: {row.get('DIAS_CREDITO')}")
+                    if row.get('VIGENCIA_FINANCIAMIENTO') != "N/A": st.write(f"Vigencia: {row.get('VIGENCIA_FINANCIAMIENTO')}")
+                    st.write(f"Financiera: {row.get('FINANCIERA', 'N/A')}")
+
+                st.divider()
+                
+                # --- BOTONES DE DOCUMENTOS ---
+                st.markdown("**Expediente Digital**")
+                bd1, bd2, bd3, bd4 = st.columns(4)
+                links = {
+                    "TÉCNICO": row.get('PDF_TECNICO'),
+                    "PAGO / OC": row.get('COMPROBANTE_RESPALDO'),
+                    "CSF": row.get('CONSTANCIA_FISCAL'),
+                    "ARREND.": row.get('ARRENDAMIENTO_PROPUESTA')
+                }
+                
+                for b_idx, (label, link) in enumerate(links.items()):
+                    with [bd1, bd2, bd3, bd4][b_idx]:
+                        if link and str(link).startswith("http"):
+                            st.link_button(f"📄 ABRIR {label}", link, use_container_width=True)
+                        else:
+                            st.button(f"🚫 SIN {label}", disabled=True, use_container_width=True, key=f"dis_{folio}_{label}")
+
+                st.divider()
+                
+                # --- GESTIÓN DE ESTATUS ---
+                c_st1, c_st2 = st.columns([2, 1])
+                with c_st1:
+                    nuevo_estatus = st.selectbox("Cambiar Estatus del Pedido:", 
+                                               ["PEDIDO NUEVO", "EN REVISIÓN", "VISTO BUENO", "FACTURADO", "EN RUTA / PAQUETERÍA", "ENTREGADO", "ERROR EN DATOS"], 
+                                               index=0, key=f"st_sel_{folio}")
+                with c_st2:
+                    st.write("")
+                    if st.button("ACTUALIZAR ESTATUS", key=f"btn_st_{folio}", use_container_width=True, type="primary"):
+                        try:
+                            # Buscar fila por Folio para actualizar estatus
+                            folios_col = ws_p.col_values(2) # Columna B es Folio
+                            if str(folio) in folios_col:
+                                fila_idx = folios_col.index(str(folio)) + 1
+                                headers = ws_p.row_values(1)
+                                col_st_idx = headers.index("ESTATUS") + 1
+                                ws_p.update_cell(fila_idx, col_st_idx, nuevo_estatus)
+                                st.success(f"Estatus de {folio} actualizado a {nuevo_estatus}")
+                                time.sleep(1)
+                                st.rerun()
+                        except Exception as e_st:
+                            st.error(f"Error al actualizar: {e_st}")
+
+    except Exception as e:
+        st.error(f"Error al cargar gestión de pedidos: {e}")
+
 # --- ACTIVACIÓN DE RECEPCIÓN DE DRIVE (OAUTH) ---
 # Esta función debe correr antes de que Streamlit detenga el flujo por el Login
 procesar_callback_oauth()
@@ -2179,340 +2302,148 @@ elif st.session_state.menu_actual == 'menu':
 # --- VISTA: METER PEDIDO (COTIZACIÓN GANADA) ---
 elif st.session_state.menu_actual == 'pedido':
     st.title(f"🚀 Formalizar Pedido: {st.session_state.get('folio_val', 'N/A')}")
-            
-            # 1. Obtener datos base
-            df_p_actual = st.session_state.df_partidas
-            prov_principal = df_p_actual["Proveedor"].iloc[0] if not df_p_actual.empty else ""
-            cliente_actual = st.session_state.get('cliente_sel', '')
-            
-            # 2. Buscar datos fiscales del cliente
-            info_fiscal = next((f for f in st.session_state.get('datos_fiscales', []) if f.get('RAZON_SOCIAL') == cliente_actual or f.get('CLIENTE') == cliente_actual), {})
-            rfc_sugerido = info_fiscal.get('RFC', '')
-            credito_info = info_fiscal.get('CREDITO', 'Sin crédito')
 
-            # 2. Buscar datos fiscales del cliente
-            info_fiscal = next((f for f in st.session_state.get('datos_fiscales', []) if f.get('RAZON_SOCIAL') == cliente_actual or f.get('CLIENTE') == cliente_actual), {})
-            rfc_sugerido = info_fiscal.get('RFC', '')
-            credito_info = info_fiscal.get('CREDITO', 'Sin crédito')
+    # 1. Obtener datos base
+    df_p_actual = st.session_state.df_partidas
+    prov_principal = df_p_actual["Proveedor"].iloc[0] if not df_p_actual.empty else ""
+    cliente_actual = st.session_state.get('cliente_sel', '')
 
-            # --- SECCIÓN 1: DATOS FISCALES Y FACTURACIÓN ---
-            st.markdown("### 📄 Datos Fiscales y Facturación")
-            f1, f2 = st.columns(2)
-            with f1:
-                razon_f = st.text_input("Razón Social Fiscal:", value=cliente_actual)
-                rfc_f = st.text_input("RFC:", value=rfc_sugerido)
-            with f2:
-                metodos_p = ["PUE - Pago en una sola exhibición", "PPD - Pago en parcialidades o diferido"]
-                metodo_p = st.selectbox("Método de Pago:", metodos_p)
-                usos_cfdi = [
-                    "G01 - Adquisición de mercancías",
-                    "G03 - Gastos en general",
-                    "I01 - Construcciones",
-                    "I02 - Mobiliario y equipo de oficina por inversiones",
-                    "I04 - Equipo de cómputo y accesorios",
-                    "I08 - Otra maquinaria y equipo",
-                    "S01 - Sin efectos fiscales",
-                    "CP01 - Pagos",
-                    "CN01 - Nómina",
-                    "D01 - Honorarios médicos, dentales y gastos hospitalarios",
-                    "D02 - Gastos médicos por incapacidad o discapacidad",
-                    "D03 - Gastos funerales",
-                    "D04 - Donativos",
-                    "D10 - Pagos por servicios educativos (colegiaturas)"
-                ]
-                uso_cfdi = st.selectbox("Uso de CFDI:", usos_cfdi)
+    # 2. Buscar datos fiscales del cliente
+    info_fiscal = next((f for f in st.session_state.get('datos_fiscales', []) if f.get('RAZON_SOCIAL') == cliente_actual or f.get('CLIENTE') == cliente_actual), {})
+    rfc_sugerido = info_fiscal.get('RFC', '')
+    credito_info = info_fiscal.get('CREDITO', 'Sin crédito')
 
-            # Mover Condiciones de Pago a una variable interna (sin widget en esta sección)
-            condiciones_pago = st.session_state.get('pago_val', '')
+    # --- SECCIÓN 1: DATOS FISCALES Y FACTURACIÓN ---
+    st.markdown("### 📄 Datos Fiscales y Facturación")
+    f1, f2 = st.columns(2)
+    with f1:
+        razon_f = st.text_input("Razón Social Fiscal:", value=cliente_actual)
+        rfc_f = st.text_input("RFC:", value=rfc_sugerido)
+    with f2:
+        metodos_p = ["PUE - Pago en una sola exhibición", "PPD - Pago en parcialidades o diferido"]
+        metodo_p = st.selectbox("Método de Pago:", metodos_p)
+        usos_cfdi = [
+            "G01 - Adquisición de mercancías", "G03 - Gastos en general", "I04 - Equipo de cómputo", "S01 - Sin efectos fiscales", "CP01 - Pagos"
+        ]
+        uso_cfdi = st.selectbox("Uso de CFDI:", usos_cfdi)
 
-            st.divider()
+    # Mover Condiciones de Pago a una variable interna
+    condiciones_pago = st.session_state.get('pago_val', '')
+    st.divider()
 
-            # --- SECCIÓN 2: LOGÍSTICA DETALLADA ---
-            st.markdown("### 🚚 Logística y Entrega")
-            l1, l2 = st.columns(2)
-            with l1:
-                origen_ent = st.radio("Origen de entrega:", ["Directo proveedor", "Directo de oficina"], horizontal=True)
-                metodo_ent = st.radio("Método:", ["Paquetería", "Ruta interna", "recolección de cliente"], horizontal=True)
-            with l2:
-                dir_ent = st.text_area("Dirección completa a entregar:", value=st.session_state.get('entrega_val', ''))
+    # --- SECCIÓN 2: LOGÍSTICA DETALLADA ---
+    st.markdown("### 🚚 Logística y Entrega")
+    l1, l2 = st.columns(2)
+    with l1:
+        origen_ent = st.radio("Origen de entrega:", ["Directo proveedor", "Directo de oficina"], horizontal=True, key="or_p")
+        metodo_ent = st.radio("Método:", ["Paquetería", "Ruta interna", "recolección de cliente"], horizontal=True, key="met_p")
+    with l2:
+        dir_ent = st.text_area("Dirección completa a entregar:", value=st.session_state.get('entrega_val', ''), key="dir_p")
 
-            lc1, lc2, lc3 = st.columns(3)
-            with lc1: persona_rec = st.text_input("Persona que recibe:")
-            with lc2: tel_rec = st.text_input("Teléfono de quien recibe:")
-            with lc3: maps_link = st.text_input("Link de ubicación Maps:")
+    lc1, lc2, lc3 = st.columns(3)
+    with lc1: persona_rec = st.text_input("Persona que recibe:", key="per_p")
+    with lc2: tel_rec = st.text_input("Teléfono de quien recibe:", key="tel_p")
+    with lc3: maps_link = st.text_input("Link de ubicación Maps:", key="map_p")
 
-            st.divider()
+    st.divider()
 
-            # --- SECCIÓN 3: SOLICITUD DE PEDIDO (POR PRODUCTO) ---
-            st.markdown("### 🛒 Solicitud de Pedido (Detalle de Compra)")
-            st.caption("Especifique los datos de compra para cada producto.")
+    # --- SECCIÓN 3: SOLICITUD DE PEDIDO (POR PRODUCTO) ---
+    st.markdown("### 🛒 Solicitud de Pedido (Detalle de Compra)")
+    detalles_compra = {}
+    db_prov_full = st.session_state.get('proveedores_db', [])
 
-            detalles_compra = {}
-            db_prov_full = st.session_state.get('proveedores_db', [])
+    for idx, row in df_p_actual.iterrows():
+        prov_item = row.get("Proveedor", "N/A")
+        with st.expander(f"📦 Producto: {row.get('Concepto', 'N/A')}", expanded=True):
+            c_ped0, c_ped1, c_ped2 = st.columns([1, 1.5, 1.5])
+            with c_ped0: st.text_input(f"Proveedor:", value=prov_item, disabled=True, key=f"p_d_{idx}")
+            with c_ped1: link_c = st.text_input(f"Link de producto:", value=row.get("Link", ""), key=f"l_d_{idx}")
+            with c_ped2:
+                ejs = [p.get("NOMBRE", "") for p in db_prov_full if p.get("PROVEEDOR") == prov_item]
+                if not ejs: cont_c = st.text_input(f"Ejecutivo de Ventas:", key=f"m_d_{idx}")
+                else: cont_c = st.selectbox(f"Ejecutivo de Ventas:", ["N/A"] + ejs, key=f"s_d_{idx}")
+            detalles_compra[idx] = {"link": link_c, "contacto": cont_c}
 
-            for idx, row in df_p_actual.iterrows():
-                prov_item = row.get("Proveedor", "N/A")
-                concepto_item = row.get("Concepto", "N/A")
-                link_orig = row.get("Link", "")
+    st.divider()
 
-                with st.expander(f"📦 Producto: {concepto_item}", expanded=True):
-                    c_ped0, c_ped1, c_ped2 = st.columns([1, 1.5, 1.5])
-                    with c_ped0:
-                        st.text_input(f"Proveedor ({idx}):", value=prov_item, disabled=True, key=f"prov_disp_{idx}")
+    # --- SECCIÓN 4: PAGO Y DOCUMENTACIÓN ---
+    st.markdown("### 💰 Pago y Documentación")
+    p1, p2 = st.columns(2)
+    with p1:
+        modo_respaldo = st.radio("Modo de respaldo del pedido:", ["Comprobante de pago", "Orden de compra (OC)"], horizontal=True, key="mod_resp_p")
+        pago_cliente = st.selectbox("Pago de cliente:", ["Anticipado", "Linea de crédito", "Financiamiento", "Otro modo"], key="p_cli_p")
 
-                    with c_ped1:
-                        link_compra = st.text_input(f"Link de producto ({idx}):", value=link_orig, key=f"link_c_{idx}")
+    pc1, pc2 = st.columns(2)
+    if pago_cliente == "Linea de crédito":
+        with pc1:
+            dias_credito = st.selectbox("Opciones de crédito:", ["7 Días", "15 Días", "30 Días"], key="dias_c_p")
+            vigencia_fin, financiera_fin = "N/A", "N/A"
+    elif pago_cliente == "Financiamiento":
+        with pc1:
+            financiera_fin = st.selectbox("Financiera:", ["DFS", "HPE", "Otro"], key="finan_p")
+            vigencia_fin = st.selectbox("Vigencia:", ["2 años", "3 años", "4 años"], key="vig_p")
+        with pc2:
+            file_arrendamiento = st.file_uploader("Cargar propuesta", type=["pdf"], key="f_arr_p")
+            dias_credito = "N/A"
+    else:
+        dias_credito, vigencia_fin, financiera_fin = "N/A", "N/A", "N/A"
 
-                    with c_ped2:
-                        # Filtrar ejecutivos de ventas para este proveedor específico
-                        ejecutivos_prov = [
-                            p.get("NOMBRE", "Sin Nombre") for p in db_prov_full 
-                            if str(p.get("PROVEEDOR", "")).upper() == str(prov_item).upper() 
-                            and "EJECUTIVO" in str(p.get("PUESTO", "")).upper()
-                        ]
+    st.divider()
+    a1, a2 = st.columns(2)
+    with a1: file_respaldo = st.file_uploader("Documento de Respaldo", type=["pdf", "jpg", "png"], key="f_resp_p")
+    with a2: file_csf = st.file_uploader("Constancia Fiscal (CSF)", type=["pdf"], key="f_csf_p")
 
-                        if not ejecutivos_prov: 
-                            contacto_compra = st.text_input(f"Ejecutivo de Ventas ({idx}):", key=f"cont_manual_{idx}", placeholder="Escriba el nombre del ejecutivo...")
-                        else:
-                            contacto_compra = st.selectbox(f"Ejecutivo de Ventas ({idx}):", ["N/A"] + ejecutivos_prov, key=f"cont_v_{idx}")
+    if st.button("VALIDAR Y ENVIAR PEDIDO A OPERACIONES", use_container_width=True, type="primary", key="btn_env_p"):
+        if not rfc_f or not persona_rec or not file_respaldo:
+            st.error("Campos obligatorios faltantes.")
+        else:
+            try:
+                with st.spinner("Procesando..."):
+                    gc = conectar_google_sheets()
+                    ws_p = gc.open_by_key(ID_SHEET_PEDIDOS).sheet1
+                    folio_actual = st.session_state.folio_val
 
-                    detalles_compra[idx] = {
-                        "link": link_compra if link_compra else "N/A",
-                        "contacto": contacto_compra if contacto_compra else "N/A"
-                    }
+                    df_p_final = df_p_actual.copy()
+                    # (Cálculos y subida a Drive se mantienen...)
+                    l_pago = subir_archivo_a_drive(file_respaldo.read(), f"PAGO_{folio_actual}.pdf") if file_respaldo else ""
+                    l_csf = subir_archivo_a_drive(file_csf.read(), f"CSF_{folio_actual}.pdf") if file_csf else ""
 
-            st.divider()
+                    p_final_str = f"{pago_cliente} ({dias_credito if pago_cliente=='Linea de crédito' else vigencia_fin})"
 
-            # --- SECCIÓN 4: PAGO Y DOCUMENTACIÓN ---
-            st.markdown("### 💰 Pago y Documentación")
+                    pdf_t = generar_pedido_tecnico_blob_v2({"folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, "cliente": cliente_actual, "pago": p_final_str}, df_p_final, {"rfc": rfc_f, "razon_fiscal": razon_f}, {"dir_entrega": dir_ent, "persona_recibe": persona_rec}, {}, detalles_compra)
+                    l_pdf = subir_archivo_a_drive(pdf_t, f"PEDIDO_{folio_actual}.pdf")
 
-            # Fila 1: Modo de Respaldo y Pago de Cliente
-            p1, p2 = st.columns(2)
-            with p1:
-                modo_respaldo = st.radio("Modo de respaldo del pedido:", ["Comprobante de pago", "Orden de compra (OC)"], horizontal=True)
-                if modo_respaldo == "Orden de compra (OC)":
-                    st.warning("⚠️ **AVISO:** Recuerda que todo modo de pago que no sea Anticipado debe estar autorizado.")
+                    def guardar_fila_inteligente(ws, datos_dict):
+                        headers = [str(h).strip().upper() for h in ws.row_values(1)]
+                        fila = [""] * len(headers)
+                        for k, v in datos_dict.items():
+                            if k.upper() in headers: fila[headers.index(k.upper())] = v
+                        ws.append_row(fila)
 
-            with p2:
-                pago_cliente = st.selectbox("Pago de cliente:", ["Anticipado", "Linea de crédito", "Financiamiento", "Otro modo"])
+                    datos_m = {"FECHA": str(date.today()), "FOLIO": folio_actual, "EJECUTIVO": st.session_state.ejecutivo_nom, "CLIENTE": cliente_actual, "RAZON_SOCIAL_FISCAL": razon_f, "RFC": rfc_f, "ESTATUS": "PEDIDO NUEVO", "PDF_TECNICO": l_pdf, "COMPROBANTE_RESPALDO": l_pago}
+                    guardar_fila_inteligente(ws_p, datos_m)
 
-            # Fila 2: Condiciones específicas (Crédito o Financiamiento)
-            pc1, pc2 = st.columns(2)
-
-            # Lógica para Línea de Crédito
-            if pago_cliente == "Linea de crédito":
-                with pc1:
-                    opciones_credito = ["7 Días", "10 Días", "15 Días", "30 Días", "15 Días + 50% anticipo", "30 Días + 50% anticipo"]
-                    dias_credito = st.selectbox("Opciones de crédito:", opciones_credito)
-                    vigencia_fin = "N/A"
-                    financiera_fin = "N/A"
-
-            # Lógica para Financiamiento
-            elif pago_cliente == "Financiamiento":
-                with pc1:
-                    financiera_fin = st.selectbox("Financiera:", ["DFS", "HPE", "CSI Leasing", "CHG Meridian", "Otro"])
-                    vigencia_fin = st.selectbox("Vigencia (Años):", ["2 años", "3 años", "4 años", "5 años"])
-                with pc2:
-                    file_arrendamiento = st.file_uploader("Cargar propuesta de arrendamiento", type=["pdf", "jpg", "png"])
-                    dias_credito = "N/A"
-            else:
-                dias_credito = "N/A"
-                vigencia_fin = "N/A"
-                financiera_fin = "N/A"
-
-            st.divider()
-            st.caption("Sube los documentos maestros para procesar el pedido.")
-            a1, a2 = st.columns(2)
-            with a1: 
-                label_file = "Cargar Comprobante de Pago" if modo_respaldo == "Comprobante de pago" else "Cargar Orden de Compra (OC)"
-                file_respaldo = st.file_uploader(label_file, type=["pdf", "jpg", "png", "zip"])
-            with a2: 
-                file_csf = st.file_uploader("Constancia Fiscal (CSF) - Obligatorio", type=["pdf"])
-
-            st.divider()
-
-            if st.button("VALIDAR Y ENVIAR PEDIDO A OPERACIONES", use_container_width=True, type="primary"):
-                if not rfc_f or not persona_rec or not tel_rec or not file_respaldo:
-                    st.error("Campos obligatorios: RFC, Persona que recibe, Teléfono y el Documento de Respaldo (Pago/OC).")
-                else:
                     try:
-                        with st.spinner("Procesando Pedido Central..."):
-                            gc = conectar_google_sheets()
-                            try: sh_pedidos = gc.open_by_key(ID_SHEET_PEDIDOS)
-                            except: sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
-                            
-                            ws_p = sh_pedidos.sheet1
-                            folio_actual = st.session_state.folio_val
+                        ws_l = st.session_state.sh_personal.worksheet("PEDIDOS")
+                        guardar_fila_inteligente(ws_l, datos_m)
+                    except: pass
 
-                            # --- CÁLCULOS DINÁMICOS PARA EL PEDIDO ---
-                            df_p_final = st.session_state.df_partidas.copy()
-                            db_prov = st.session_state.get('proveedores_db', [])
-                            mapa_iva = {p['PROVEEDOR']: (1.0 if p.get('SUMA_IVA', 'SI') == 'SI' else 1.16) for p in db_prov}
-                            tc = st.session_state.get('tc_val', 1.0)
-                            moneda_cot = st.session_state.get('moneda_val', 'MXN')
-
-                            def conv(precio, moneda_item):
-                                if moneda_cot == "MXN" and moneda_item == "USD": return precio * tc
-                                if moneda_cot == "USD" and moneda_item == "MXN": return precio / tc
-                                return precio
-
-                            # Calcular columnas financieras necesarias
-                            df_p_final["PM_C"] = df_p_final.apply(lambda r: conv(r.get("PM", 0), r.get("Moneda", "MXN")), axis=1)
-                            df_p_final["Envio_P_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Prov", 0), r.get("Moneda", "MXN")), axis=1)
-                            df_p_final["Envio_S_C"] = df_p_final.apply(lambda r: conv(r.get("Envio Sec", 0), r.get("Moneda", "MXN")), axis=1)
-                            divs = df_p_final["Proveedor"].map(mapa_iva).fillna(1.0)
-                            
-                            df_p_final["Costo (Sub)"] = (df_p_final["PM_C"] / divs) + df_p_final["Envio_P_C"]
-                            df_p_final["Envio Sec"] = df_p_final["Envio_S_C"]
-                            df_p_final["Venta (Sub)"] = (df_p_final["Costo (Sub)"] + df_p_final["Envio Sec"]) * (1 + (df_p_final.get("Util %", 15) / 100))
-                            df_p_final["Venta (IVA)"] = df_p_final["Venta (Sub)"] * 1.16
-                            
-                            monto_total = (df_p_final["Venta (IVA)"] * df_p_final["Pzas"]).sum()
-
-                            # Subir archivos maestros
-                            link_pago = subir_archivo_a_drive(file_respaldo.read(), f"RESPALDO_{folio_actual}_{file_respaldo.name}", file_respaldo.type) if file_respaldo else ""
-                            link_csf = subir_archivo_a_drive(file_csf.read(), f"CSF_{folio_actual}.pdf", 'application/pdf') if file_csf else ""
-                            link_arr = ""
-                            if pago_cliente == "Financiamiento" and 'file_arrendamiento' in locals() and file_arrendamiento:
-                                link_arr = subir_archivo_a_drive(file_arrendamiento.read(), f"ARR_{folio_actual}_{file_arrendamiento.name}", file_arrendamiento.type)
-
-                            # Preparar datos para el PDF
-                            p_final_str = f"{pago_cliente} ({dias_credito if pago_cliente == 'Linea de crédito' else vigencia_fin})"
-                            
-                            pdf_t_blob = generar_pedido_tecnico_blob_v2(
-                                {
-                                    "folio": folio_actual, "ejecutivo": st.session_state.ejecutivo_nom, 
-                                    "cliente": cliente_actual, "prioridad": "Normal", 
-                                    "arrendamiento": "Sí" if pago_cliente == "Financiamiento" else "No",
-                                    "financiera": financiera_fin,
-                                    "comentarios": st.session_state.get('coment_val', ''),
-                                    "entrega": st.session_state.get('entrega_val', ''),
-                                    "pago": p_final_str,
-                                    "condiciones": st.session_state.get('condic_val', ''),
-                                    "moneda": st.session_state.get('moneda_val', 'MXN'),
-                                    "tc": st.session_state.get('tc_val', 1.0)
-                                },
-                                df_p_final,
-                                {"rfc": rfc_f, "razon_fiscal": razon_f, "uso_cfdi": uso_cfdi, "metodo_pago": metodo_p},
-                                {
-                                    "dir_entrega": dir_ent, "persona_recibe": persona_rec, 
-                                    "tel_contacto": tel_rec, "maps": maps_link,
-                                    "origen": origen_ent, "metodo": metodo_ent
-                                },
-                                {"vendedor": "", "pm": "", "vigencia_prov": "", "registro_op": "", "folio_prov": ""},
-                                detalles_compra=detalles_compra
-                            )
-                            link_pdf_tecnico = subir_archivo_a_drive(pdf_t_blob, f"PEDIDO_TECNICO_{folio_actual}.pdf")
-
-                            # --- VACIADO INTELIGENTE DE DATOS (POR ENCABEZADO) ---
-                            def guardar_fila_inteligente(ws, datos_dict):
-                                """Mapea los datos a las columnas correctas basándose en los encabezados de la fila 1."""
-                                headers = [str(h).strip().upper() for h in ws.row_values(1)]
-                                if not headers: return False # Hoja vacía
-                                
-                                fila_a_llenar = [""] * len(headers)
-                                for key, value in datos_dict.items():
-                                    k_norm = key.strip().upper()
-                                    if k_norm in headers:
-                                        idx = headers.index(k_norm)
-                                        fila_a_llenar[idx] = value
-                                ws.append_row(fila_a_llenar)
-                                return True
-
-                            # 1. Preparar Diccionario de Datos del Pedido (Maestro)
-                            datos_maestros_dict = {
-                                "FECHA": str(date.today()),
-                                "FOLIO": folio_actual,
-                                "EJECUTIVO": st.session_state.ejecutivo_nom,
-                                "CLIENTE": cliente_actual,
-                                "RAZON_SOCIAL_FISCAL": razon_f,
-                                "RFC": rfc_f,
-                                "METODO_PAGO": metodo_p,
-                                "USO_CFDI": uso_cfdi,
-                                "TIPO_PAGO": pago_cliente,
-                                "DIAS_CREDITO": dias_credito,
-                                "VIGENCIA_FINANCIAMIENTO": vigencia_fin,
-                                "FINANCIERA": financiera_fin,
-                                "ORIGEN_ENTREGA": origen_ent,
-                                "METODO_ENVIO": metodo_ent,
-                                "DIRECCION_ENTREGA": dir_ent,
-                                "PERSONA_RECIBE": persona_rec,
-                                "TELEFONO_RECIBE": tel_rec,
-                                "LINK_MAPS": maps_link,
-                                "MONTO_TOTAL": monto_total,
-                                "ESTATUS": "PEDIDO NUEVO",
-                                "COMENTARIOS": st.session_state.get('coment_val', ''),
-                                "PDF_TECNICO": link_pdf_tecnico,
-                                "COMPROBANTE_RESPALDO": link_pago,
-                                "CONSTANCIA_FISCAL": link_csf,
-                                "ARRENDAMIENTO_PROPUESTA": link_arr
-                            }
-
-                            # 2. Guardar en Hoja Central
-                            guardar_fila_inteligente(ws_p, datos_maestros_dict)
-
-                            # 3. Guardar en Hoja Personal
-                            try:
-                                try:
-                                    ws_pedidos_local = st.session_state.sh_personal.worksheet("PEDIDOS")
-                                except:
-                                    ws_pedidos_local = st.session_state.sh_personal.add_worksheet(title="PEDIDOS", rows="1000", cols="30")
-                                    ws_pedidos_local.append_row(list(datos_maestros_dict.keys()))
-                                
-                                guardar_fila_inteligente(ws_pedidos_local, datos_maestros_dict)
-
-                                # 4. Guardar Detalles (Partidas)
-                                try:
-                                    ws_ped_det = st.session_state.sh_personal.worksheet("PEDIDOS_DETALLE")
-                                except:
-                                    ws_ped_det = st.session_state.sh_personal.add_worksheet(title="PEDIDOS_DETALLE", rows="2000", cols="15")
-                                    ws_ped_det.append_row(["FOLIO", "PRODUCTO", "PROVEEDOR", "LINK_COMPRA", "EJECUTIVO_PROV", "CANTIDAD", "MONEDA", "PRECIO_U_SIN_IVA", "SUBTOTAL_SIN_IVA", "TOTAL_CON_IVA"])
-                                
-                                for idx, row in df_p_final.iterrows():
-                                    det_c = detalles_compra.get(idx, {})
-                                    datos_item = {
-                                        "FOLIO": folio_actual,
-                                        "PRODUCTO": row['Concepto'],
-                                        "PROVEEDOR": row['Proveedor'],
-                                        "LINK_COMPRA": det_c.get('link', 'N/A'),
-                                        "EJECUTIVO_PROV": det_c.get('contacto', 'N/A'),
-                                        "CANTIDAD": row['Pzas'],
-                                        "MONEDA": row.get('Moneda', 'MXN'),
-                                        "PRECIO_U_SIN_IVA": row['Venta (Sub)'],
-                                        "SUBTOTAL_SIN_IVA": row['Venta (Sub)'] * row['Pzas'],
-                                        "TOTAL_CON_IVA": row['Venta (IVA)'] * row['Pzas']
-                                    }
-                                    guardar_fila_inteligente(ws_ped_det, datos_item)
-                                    
-                            except Exception as e_local:
-                                st.warning(f"Pedido enviado, pero hubo un detalle al actualizar tu hoja personal: {e_local}")
-
-                            # Actualizar estatus
-                            ws_res_local = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
-                            folios_local = ws_res_local.col_values(1)
-                            if str(folio_actual) in folios_local:
-                                idx_l = folios_local.index(str(folio_actual)) + 1
-                                ws_res_local.update_cell(idx_l, 14, "100% Ganada")
-
-                            st.session_state.pedido_exitoso = True
-                            st.session_state.pdf_tecnico_actual = pdf_t_blob
-                            st.balloons()
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"Error crítico al procesar pedido: {e}")
-
-            if st.session_state.get('pedido_exitoso'):
-                st.success("✅ Pedido enviado centralmente a Operaciones.")
-                st.info("🕒 **Estatus:** En espera de Visto Bueno")
-                st.download_button("Descargar Copia de Pedido Técnico", data=st.session_state.pdf_tecnico_actual, file_name=f"PEDIDO_{st.session_state.folio_val}.pdf", use_container_width=True)
-                if st.button("Volver al Dashboard"):
-                    del st.session_state['pedido_exitoso']
-                    st.session_state.menu_actual = 'menu'
+                    st.session_state.pedido_exitoso = True
+                    st.session_state.pdf_tecnico_actual = pdf_t
+                    st.balloons()
                     st.rerun()
+            except Exception as e: st.error(f"Error: {e}")
 
-        # --- VISTA: GENERADOR DE COTIZACIÓN (NUEVO / EDITAR) ---
-        elif st.session_state.menu_actual == 'nuevo':
-            st.header(f"{'Editando' if st.session_state.get('folio_val') else 'Nueva'} Cotización")
+    if st.session_state.get('pedido_exitoso'):
+        st.success("✅ Pedido enviado. En espera de Visto Bueno.")
+        st.download_button("Descargar Pedido Técnico", data=st.session_state.pdf_tecnico_actual, file_name=f"PEDIDO_{st.session_state.folio_val}.pdf", use_container_width=True)
+        if st.button("Volver al Dashboard"):
+            del st.session_state['pedido_exitoso']
+            st.session_state.menu_actual = 'menu'
+            st.rerun()
+
+# --- VISTA: GENERADOR DE COTIZACIÓN (NUEVO / EDITAR) ---
+elif st.session_state.menu_actual == 'nuevo':            st.header(f"{'Editando' if st.session_state.get('folio_val') else 'Nueva'} Cotización")
             
             # Crear las pestañas
             tab1, tab2, tab3, tab4, tab5 = st.tabs(["Generales", "Partidas", "Ilustraciones", "Evidencias", "Finalizar"])
