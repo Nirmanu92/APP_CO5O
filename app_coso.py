@@ -1237,7 +1237,7 @@ def cargar_datos_sesion_usuario():
                             if f_id: sh_m = gc.open_by_key(f_id)
                             else: sh_m = gc.open(f_name)
                             
-                            for ws_name in [nombre_ws, "TERMINOS", "PROVEEDORES", "Hoja1", "HOJA1", "Sheet1"]:
+                            for ws_name in [nombre_ws, "TERMINOS", "PROVEEDORES", "Hoja 1", "Hoja1", "HOJA 1", "HOJA1", "Sheet1"]:
                                 try:
                                     ws_m = sh_m.worksheet(ws_name)
                                     recs = ws_m.get_all_records()
@@ -2434,9 +2434,12 @@ elif st.session_state.menu_actual == 'nuevo':
         t1, t2, t3 = st.columns(3)
         
         with t1:
-            # Entrega: Filtrar del DB o usar lista maestra si falla
-            db_ent = [str(t.get('VALOR', '')) for t in terminos_raw if str(t.get('CATEGORIA', '')).strip().upper() == 'ENTREGA']
-            lista_ent = sorted(list(set([x for x in db_ent if x.strip()])))
+            # Intentar leer de columna específica (Hoja 1 Col A) o formato CATEGORIA/VALOR
+            db_ent = [str(t.get('TIEMPO_DE_ENTREGA', '')) for t in terminos_raw if t.get('TIEMPO_DE_ENTREGA')]
+            if not db_ent:
+                db_ent = [str(t.get('VALOR', '')) for t in terminos_raw if str(t.get('CATEGORIA', '')).strip().upper() == 'ENTREGA']
+            
+            lista_ent = sorted(list(set([x for x in db_ent if str(x).strip()])))
             if not lista_ent:
                 lista_ent = ["Inmediata", "3 a 5 días hábiles", "1 a 2 semanas", "Sujeto a existencias"]
             
@@ -2446,9 +2449,12 @@ elif st.session_state.menu_actual == 'nuevo':
             st.session_state.entrega_val = st.selectbox("Tiempo de Entrega:", opciones_ent, index=idx_ent, key="ent_f")
             
         with t2:
-            # Pago: Filtrar del DB o usar lista maestra si falla
-            db_pag = [str(t.get('VALOR', '')) for t in terminos_raw if str(t.get('CATEGORIA', '')).strip().upper() == 'PAGO']
-            lista_pag = sorted(list(set([x for x in db_pag if x.strip()])))
+            # Intentar leer de columna específica (Hoja 1 Col B) o formato CATEGORIA/VALOR
+            db_pag = [str(t.get('FORMA_DE_PAGO', '')) for t in terminos_raw if t.get('FORMA_DE_PAGO')]
+            if not db_pag:
+                db_pag = [str(t.get('VALOR', '')) for t in terminos_raw if str(t.get('CATEGORIA', '')).strip().upper() == 'PAGO']
+            
+            lista_pag = sorted(list(set([x for x in db_pag if str(x).strip()])))
             if not lista_pag:
                 lista_pag = ["Contado", "50% Anticipo / 50% Entrega", "Crédito 15 días", "Crédito 30 días"]
             
@@ -2458,9 +2464,12 @@ elif st.session_state.menu_actual == 'nuevo':
             st.session_state.pago_val = st.selectbox("Forma de Pago:", opciones_pag, index=idx_pag, key="pag_f")
             
         with t3:
-            # Condiciones: Filtrar del DB o usar lista maestra si falla
-            db_con = [str(t.get('VALOR', '')) for t in terminos_raw if str(t.get('CATEGORIA', '')).strip().upper() == 'CONDICIONES']
-            lista_con = sorted(list(set([x for x in db_con if x.strip()])))
+            # Intentar leer de columna específica (Hoja 1 Col C) o formato CATEGORIA/VALOR
+            db_con = [str(t.get('CONDICIONES', '')) for t in terminos_raw if t.get('CONDICIONES')]
+            if not db_con:
+                db_con = [str(t.get('VALOR', '')) for t in terminos_raw if str(t.get('CATEGORIA', '')).strip().upper() == 'CONDICIONES']
+            
+            lista_con = sorted(list(set([x for x in db_con if str(x).strip()])))
             if not lista_con:
                 lista_con = ["Precios sujetos a cambio sin previo aviso", "Garantía de 1 año", "L.A.B. Nuestras oficinas"]
             
