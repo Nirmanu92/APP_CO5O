@@ -1750,17 +1750,150 @@ else:
             autenticar_usuario_oauth()
             st.divider()
 
+def renderizar_gestion_pedidos_central():
+    st.title("📦 Centro de Gestión de Pedidos (Administración)")
+    st.info("Visualización y control de pedidos de todo el ecosistema CO5O.")
+
+    try:
+        gc = conectar_google_sheets()
+        sh_p = gc.open_by_key(ID_SHEET_PEDIDOS)
+        ws_p = sh_p.sheet1
+        data_p = ws_p.get_all_records()
+        df_p = pd.DataFrame(data_p)
+        
+        if df_p.empty:
+            st.info("No hay pedidos registrados en el sistema central.")
+            return
+
+        # --- FILTROS SUPERIORES ---
+        c_f1, c_f2, c_f3 = st.columns(3)
+        with c_f1:
+            ej_lista = ["Todos"] + sorted(list(df_p['EJECUTIVO'].unique()))
+            ej_sel = st.selectbox("Filtrar por Ejecutivo:", ej_lista)
+        with c_f2:
+            st_lista = ["Todos"] + sorted(list(df_p['ESTATUS'].unique()))
+            st_sel = st.selectbox("Filtrar por Estatus:", st_lista)
+        with c_f3:
+            busqueda = st.text_input("Buscar por Folio o Cliente:")
+
+        # Aplicar Filtros
+        if ej_sel != "Todos": df_p = df_p[df_p['EJECUTIVO'] == ej_sel]
+        if st_sel != "Todos": df_p = df_p[df_p['ESTATUS'] == st_sel]
+        if busqueda:
+            df_p = df_p[df_p['FOLIO'].astype(str).str.contains(busqueda, case=False) | df_p['CLIENTE'].astype(str).str.contains(busqueda, case=False)]
+
+        # --- KPIs RÁPIDOS ---
+        st.divider()
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Pedidos Totales", len(df_p))
+        k2.metric("Nuevos", len(df_p[df_p['ESTATUS'] == "PEDIDO NUEVO"]))
+        monto_total_val = pd.to_numeric(df_p['MONTO_TOTAL'], errors='coerce').sum()
+        k3.metric("Monto en Gestión", f"$ {monto_total_val:,.2f}")
+        k4.metric("Ejecutivos Activos", len(df_p['EJECUTIVO'].unique()))
+
+        st.divider()
+
+        # --- LISTA DE PEDIDOS ---
+        for i, row in df_p.iloc[::-1].iterrows():
+            folio = row.get('FOLIO', 'N/A')
+            cliente = row.get('CLIENTE', 'N/A')
+            monto = row.get('MONTO_TOTAL', 0)
+            estatus = row.get('ESTATUS', 'N/A')
+            ejecutivo = row.get('EJECUTIVO', 'N/A')
+            
+            with st.expander(f"📄 {folio} | {cliente} | {ejecutivo} | ${monto:,.2f} | {estatus}"):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.markdown("**Datos Fiscales**")
+                    st.write(f"RFC: {row.get('RFC', 'N/A')}")
+                    st.write(f"RS: {row.get('RAZON_SOCIAL_FISCAL', 'N/A')}")
+                    st.write(f"Uso: {row.get('USO_CFDI', 'N/A')}")
+                    st.write(f"Método: {row.get('METODO_PAGO', 'N/A')}")
+                
+                with c2:
+                    st.markdown("**Logística**")
+                    st.write(f"Origen: {row.get('ORIGEN_ENTREGA', 'N/A')}")
+                    st.write(f"Método: {row.get('METODO_ENVIO', 'N/A')}")
+                    st.write(f"Recibe: {row.get('PERSONA_RECIBE', 'N/A')}")
+                    maps = row.get('LINK_MAPS', '')
+                    if maps and str(maps).startswith("http"):
+                        st.link_button("📍 VER UBICACIÓN MAPS", maps, use_container_width=True)
+                
+                with c3:
+                    st.markdown("**Pago y Crédito**")
+                    st.write(f"Tipo: {row.get('TIPO_PAGO', 'N/A')}")
+                    if row.get('DIAS_CREDITO') != "N/A": st.write(f"Días: {row.get('DIAS_CREDITO')}")
+                    if row.get('VIGENCIA_FINANCIAMIENTO') != "N/A": st.write(f"Vigencia: {row.get('VIGENCIA_FINANCIAMIENTO')}")
+                    st.write(f"Financiera: {row.get('FINANCIERA', 'N/A')}")
+
+                st.divider()
+                
+                # --- BOTONES DE DOCUMENTOS ---
+                st.markdown("**Expediente Digital**")
+                bd1, bd2, bd3, bd4 = st.columns(4)
+                links = {
+                    "TÉCNICO": row.get('PDF_TECNICO'),
+                    "PAGO / OC": row.get('COMPROBANTE_RESPALDO'),
+                    "CSF": row.get('CONSTANCIA_FISCAL'),
+                    "ARREND.": row.get('ARRENDAMIENTO_PROPUESTA')
+                }
+                
+                for b_idx, (label, link) in enumerate(links.items()):
+                    with [bd1, bd2, bd3, bd4][b_idx]:
+                        if link and str(link).startswith("http"):
+                            st.link_button(f"📄 ABRIR {label}", link, use_container_width=True)
+                        else:
+                            st.button(f"🚫 SIN {label}", disabled=True, use_container_width=True, key=f"dis_{folio}_{label}")
+
+                st.divider()
+                
+                # --- GESTIÓN DE ESTATUS ---
+                c_st1, c_st2 = st.columns([2, 1])
+                with c_st1:
+                    nuevo_estatus = st.selectbox("Cambiar Estatus del Pedido:", 
+                                               ["PEDIDO NUEVO", "EN REVISIÓN", "VISTO BUENO", "FACTURADO", "EN RUTA / PAQUETERÍA", "ENTREGADO", "ERROR EN DATOS"], 
+                                               index=0, key=f"st_sel_{folio}")
+                with c_st2:
+                    st.write("")
+                    if st.button("ACTUALIZAR ESTATUS", key=f"btn_st_{folio}", use_container_width=True, type="primary"):
+                        try:
+                            # Buscar fila por Folio para actualizar estatus
+                            folios_col = ws_p.col_values(2) # Columna B es Folio
+                            if str(folio) in folios_col:
+                                fila_idx = folios_col.index(str(folio)) + 1
+                                headers = ws_p.row_values(1)
+                                col_st_idx = headers.index("ESTATUS") + 1
+                                ws_p.update_cell(fila_idx, col_st_idx, nuevo_estatus)
+                                st.success(f"Estatus de {folio} actualizado a {nuevo_estatus}")
+                                time.sleep(1)
+                                st.rerun()
+                        except Exception as e_st:
+                            st.error(f"Error al actualizar: {e_st}")
+
+    except Exception as e:
+        st.error(f"Error al cargar gestión de pedidos: {e}")
+
         # --- NAVEGACIÓN DE VISTAS ---
         if st.session_state.menu_actual == 'ovo':
             renderizar_buscador_ovo()
+        elif st.session_state.menu_actual == 'gestion_pedidos':
+            renderizar_gestion_pedidos_central()
+        elif st.session_state.menu_actual == 'pedido':
+            st.title(f"🚀 Formalizar Pedido: {st.session_state.folio_val}")
+            
+            # ... (resto de la vista de pedido)
 
         elif st.session_state.menu_actual == 'menu':
-            if st.session_state.rol == "OPERACIONES":
-                # --- VISTA PARA SALES OPERATION SUPPORT (SALVADOR) ---
-                col_acc1, col_acc2, _ = st.columns([1, 1, 1])
+            if st.session_state.rol in ["OPERACIONES", "DIRECCION"]:
+                # --- VISTA PARA SALES OPERATION SUPPORT / DIRECCION ---
+                col_acc1, col_acc2, col_acc3 = st.columns([1, 1, 1])
                 with col_acc1:
                     if st.button("🔎 BUSCADOR DE VÍNCULOS", use_container_width=True, type="primary"):
                         st.session_state.menu_actual = 'ovo'
+                        st.rerun()
+                with col_acc2:
+                    if st.button("📦 GESTIÓN DE PEDIDOS", use_container_width=True):
+                        st.session_state.menu_actual = 'gestion_pedidos'
                         st.rerun()
                 st.divider()
                 renderizar_dashboard_operaciones()
