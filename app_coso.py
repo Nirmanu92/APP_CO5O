@@ -1908,277 +1908,277 @@ elif st.session_state.menu_actual == 'menu':
                 df_activos_stats = df_stats[~df_stats['ESTATUS'].isin(estatus_cerrados)]
                 df_cerrados_stats = df_stats[df_stats['ESTATUS'].isin(estatus_cerrados)]
 
-                        monto_activo = df_activos_stats['MONTO_TOTAL'].sum()
-                        util_activa = df_activos_stats['UTILIDAD_TOTAL'].sum()
-                        monto_ganado = df_stats[df_stats['ESTATUS'].isin(["100% Ganada", "100% Pedido"])]['MONTO_TOTAL'].sum()
+                monto_activo = df_activos_stats['MONTO_TOTAL'].sum()
+                util_activa = df_activos_stats['UTILIDAD_TOTAL'].sum()
+                monto_ganado = df_stats[df_stats['ESTATUS'].isin(["100% Ganada", "100% Pedido"])]['MONTO_TOTAL'].sum()
 
-                        # --- NUEVO: CÁLCULO DE DÍAS SIN CONTACTO ---
-                        def calcular_dias(fecha_str):
-                            try:
-                                f = datetime.strptime(str(fecha_str), "%Y-%m-%d").date()
-                                return (date.today() - f).days
-                            except: return 0
+                # --- NUEVO: CÁLCULO DE DÍAS SIN CONTACTO ---
+                def calcular_dias(fecha_str):
+                    try:
+                        f = datetime.strptime(str(fecha_str), "%Y-%m-%d").date()
+                        return (date.today() - f).days
+                    except: return 0
 
-                        df_activos_stats['DIAS_SIN_CONTACTO'] = df_activos_stats['ULTIMO_CONTACTO'].apply(calcular_dias) if 'ULTIMO_CONTACTO' in df_activos_stats.columns else 0
+                df_activos_stats['DIAS_SIN_CONTACTO'] = df_activos_stats['ULTIMO_CONTACTO'].apply(calcular_dias) if 'ULTIMO_CONTACTO' in df_activos_stats.columns else 0
 
-                        # --- BLOQUE DE INTELIGENCIA VISUAL (NUEVO) ---
-                        st.markdown("### 🚀 Vista Rápida")
+                # --- BLOQUE DE INTELIGENCIA VISUAL (NUEVO) ---
+                st.markdown("### 🚀 Vista Rápida")
 
-                        # 1. Tarjetas de Proyectos Recientes
-                        df_recientes = df_stats.iloc[::-1].head(3)
-                        c_rec = st.columns(3)
-                        for idx_r, (_, row_r) in enumerate(df_recientes.iterrows()):
-                            with c_rec[idx_r]:
-                                color_st = "#3498DB" if "Propuesta" in row_r['ESTATUS'] else ("#2ECC71" if "Ganada" in row_r['ESTATUS'] else "#94A3B8")
-                                st.markdown(f"""
-                                <div style='background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px;'>
-                                    <p style='margin:0; font-size: 12px; color: #94A3B8;'>{row_r[col_folio]}</p>
-                                    <p style='margin:0; font-size: 16px; font-weight: bold;'>{row_r[col_cliente][:20]}...</p>
-                                    <p style='margin:0; font-size: 14px; color: {color_st}; font-weight: bold;'>{row_r['ESTATUS']}</p>
-                                    <p style='margin:0; font-size: 18px; margin-top: 10px;'>$ {row_r['MONTO_TOTAL']:,.2f}</p>
-                                </div>
-                                """, unsafe_allow_html=True)
+                # 1. Tarjetas de Proyectos Recientes
+                df_recientes = df_stats.iloc[::-1].head(3)
+                c_rec = st.columns(3)
+                for idx_r, (_, row_r) in enumerate(df_recientes.iterrows()):
+                    with c_rec[idx_r]:
+                        color_st = "#3498DB" if "Propuesta" in row_r['ESTATUS'] else ("#2ECC71" if "Ganada" in row_r['ESTATUS'] else "#94A3B8")
+                        st.markdown(f"""
+                        <div style='background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px;'>
+                            <p style='margin:0; font-size: 12px; color: #94A3B8;'>{row_r[col_folio]}</p>
+                            <p style='margin:0; font-size: 16px; font-weight: bold;'>{row_r[col_cliente][:20]}...</p>
+                            <p style='margin:0; font-size: 14px; color: {color_st}; font-weight: bold;'>{row_r['ESTATUS']}</p>
+                            <p style='margin:0; font-size: 18px; margin-top: 10px;'>$ {row_r['MONTO_TOTAL']:,.2f}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                        st.write("")
+                st.write("")
 
-                        # --- NUEVO: ALERTA DE SEGUIMIENTO ---
-                        if 'DIAS_SIN_CONTACTO' in df_activos_stats.columns and not df_activos_stats.empty:
-                            st.markdown("### ⚠️ Alerta de Seguimiento (Sin contacto)")
-                            df_alertas = df_activos_stats.sort_values('DIAS_SIN_CONTACTO', ascending=False).head(3)
-                            c_al = st.columns(3)
-                            for idx_al, (_, row_al) in enumerate(df_alertas.iterrows()):
-                                with c_al[idx_al]:
-                                    dias = row_al['DIAS_SIN_CONTACTO']
-                                    color_al = "#E74C3C" if dias > 15 else ("#F39C12" if dias > 7 else "#2ECC71")
-                                    st.markdown(f"""
-                                    <div style='background: rgba(231, 76, 60, 0.05); border: 1px solid {color_al}; border-radius: 10px; padding: 10px;'>
-                                        <p style='margin:0; font-size: 11px; color: #94A3B8;'>{row_al[col_folio]}</p>
-                                        <p style='margin:0; font-size: 14px; font-weight: bold;'>{row_al[col_cliente][:18]}</p>
-                                        <p style='margin:0; font-size: 13px; color: {color_al}; font-weight: bold;'>Hace {dias} días</p>
-                                        <p style='margin:0; font-size: 11px;'>Último: {row_al.get('ULTIMO_CONTACTO', 'N/A')}</p>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                            st.write("")
+                # --- NUEVO: ALERTA DE SEGUIMIENTO ---
+                if 'DIAS_SIN_CONTACTO' in df_activos_stats.columns and not df_activos_stats.empty:
+                    st.markdown("### ⚠️ Alerta de Seguimiento (Sin contacto)")
+                    df_alertas = df_activos_stats.sort_values('DIAS_SIN_CONTACTO', ascending=False).head(3)
+                    c_al = st.columns(3)
+                    for idx_al, (_, row_al) in enumerate(df_alertas.iterrows()):
+                        with c_al[idx_al]:
+                            dias = row_al['DIAS_SIN_CONTACTO']
+                            color_al = "#E74C3C" if dias > 15 else ("#F39C12" if dias > 7 else "#2ECC71")
+                            st.markdown(f"""
+                            <div style='background: rgba(231, 76, 60, 0.05); border: 1px solid {color_al}; border-radius: 10px; padding: 10px;'>
+                                <p style='margin:0; font-size: 11px; color: #94A3B8;'>{row_al[col_folio]}</p>
+                                <p style='margin:0; font-size: 14px; font-weight: bold;'>{row_al[col_cliente][:18]}</p>
+                                <p style='margin:0; font-size: 13px; color: {color_al}; font-weight: bold;'>Hace {dias} días</p>
+                                <p style='margin:0; font-size: 11px;'>Último: {row_al.get('ULTIMO_CONTACTO', 'N/A')}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    st.write("")
 
-                        # 2. Gráfico de Pipeline (Tubería)
-                        col_g1, col_g2 = st.columns([2, 1])
-                        with col_g1:
-                            # Agrupar por estatus para el gráfico
-                            df_pipe = df_stats.groupby('ESTATUS')['MONTO_TOTAL'].sum().reset_index()
-                            # Ordenar por importancia de estatus (aproximado)
-                            orden_estatus = ["10% Prospecto", "30% Levantamiento", "60% Propuesta", "90% Negociación", "100% Ganada", "100% Pedido", "0% Cancelada"]
-                            df_pipe['ESTATUS'] = pd.Categorical(df_pipe['ESTATUS'], categories=orden_estatus, ordered=True)
-                            df_pipe = df_pipe.sort_values('ESTATUS')
+                # 2. Gráfico de Pipeline (Tubería)
+                col_g1, col_g2 = st.columns([2, 1])
+                with col_g1:
+                    # Agrupar por estatus para el gráfico
+                    df_pipe = df_stats.groupby('ESTATUS')['MONTO_TOTAL'].sum().reset_index()
+                    # Ordenar por importancia de estatus (aproximado)
+                    orden_estatus = ["10% Prospecto", "30% Levantamiento", "60% Propuesta", "90% Negociación", "100% Ganada", "100% Pedido", "0% Cancelada"]
+                    df_pipe['ESTATUS'] = pd.Categorical(df_pipe['ESTATUS'], categories=orden_estatus, ordered=True)
+                    df_pipe = df_pipe.sort_values('ESTATUS')
 
-                            fig = px.bar(df_pipe, x='ESTATUS', y='MONTO_TOTAL', 
-                                        title="Distribución de la Tubería (Monto)",
-                                        color='ESTATUS',
-                                        color_discrete_sequence=px.colors.sequential.Blues_r)
+                    fig = px.bar(df_pipe, x='ESTATUS', y='MONTO_TOTAL', 
+                                title="Distribución de la Tubería (Monto)",
+                                color='ESTATUS',
+                                color_discrete_sequence=px.colors.sequential.Blues_r)
 
-                            fig.update_layout(
-                                plot_bgcolor='rgba(0,0,0,0)',
-                                paper_bgcolor='rgba(0,0,0,0)',
-                                font_color='#E2E8F0',
-                                xaxis_title="",
-                                yaxis_title="Monto ($)",
-                                showlegend=False,
-                                height=350
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
+                    fig.update_layout(
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font_color='#E2E8F0',
+                        xaxis_title="",
+                        yaxis_title="Monto ($)",
+                        showlegend=False,
+                        height=350
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
 
-                        with col_g2:
-                            # Gráfico de dona: Proporción de clientes
-                            df_pie = df_stats[col_cliente].value_counts().head(5).reset_index()
-                            df_pie.columns = ['Cliente', 'Cant']
-                            fig_pie = px.pie(df_pie, values='Cant', names='Cliente', 
-                                        title="Top 5 Clientes",
-                                        hole=0.6,
-                                        color_discrete_sequence=px.colors.sequential.Aggrnyl)
-                            fig_pie.update_layout(
-                                plot_bgcolor='rgba(0,0,0,0)',
-                                paper_bgcolor='rgba(0,0,0,0)',
-                                font_color='#E2E8F0',
-                                showlegend=False,
-                                height=350
-                            )
-                            st.plotly_chart(fig_pie, use_container_width=True)
+                with col_g2:
+                    # Gráfico de dona: Proporción de clientes
+                    df_pie = df_stats[col_cliente].value_counts().head(5).reset_index()
+                    df_pie.columns = ['Cliente', 'Cant']
+                    fig_pie = px.pie(df_pie, values='Cant', names='Cliente', 
+                                title="Top 5 Clientes",
+                                hole=0.6,
+                                color_discrete_sequence=px.colors.sequential.Aggrnyl)
+                    fig_pie.update_layout(
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font_color='#E2E8F0',
+                        showlegend=False,
+                        height=350
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
 
-                        st.subheader("Tu Inteligencia de Negocio")
-                        m1, m2, m3, m4 = st.columns(4)
-                        with m1: st.metric("Ventas Activas", f"$ {monto_activo:,.0f}", help="Valor total en la tubería")
-                        with m2: st.metric("Utilidad en Tubería", f"$ {util_activa:,.0f}", help="Suma de utilidad de proyectos abiertos")
-                        with m3: st.metric("Total Ganado", f"$ {monto_ganado:,.0f}", help="Suma de montos de proyectos al 100%")
+                st.subheader("Tu Inteligencia de Negocio")
+                m1, m2, m3, m4 = st.columns(4)
+                with m1: st.metric("Ventas Activas", f"$ {monto_activo:,.0f}", help="Valor total en la tubería")
+                with m2: st.metric("Utilidad en Tubería", f"$ {util_activa:,.0f}", help="Suma de utilidad de proyectos abiertos")
+                with m3: st.metric("Total Ganado", f"$ {monto_ganado:,.0f}", help="Suma de montos de proyectos al 100%")
 
-                        # Encontrar Proveedor más usado
-                        prov_top = df_det_all['PROVEEDOR'].mode().iloc[0] if not df_det_all.empty and 'PROVEEDOR' in df_det_all.columns else "N/A"
-                        with m4: st.metric("Proveedor Estrella", prov_top)
+                # Encontrar Proveedor más usado
+                prov_top = df_det_all['PROVEEDOR'].mode().iloc[0] if not df_det_all.empty and 'PROVEEDOR' in df_det_all.columns else "N/A"
+                with m4: st.metric("Proveedor Estrella", prov_top)
 
-                        st.write("")
+                st.write("")
 
-                        # --- BLOQUE DE RANKINGS ---
-                        col_r1, col_r2 = st.columns(2)
+                # --- BLOQUE DE RANKINGS ---
+                col_r1, col_r2 = st.columns(2)
 
-                        with col_r1:
-                            st.markdown("### 💎 Proyectos más Rentables (Utilidad)")
-                            df_top_util = df_stats.sort_values('UTILIDAD_TOTAL', ascending=False).head(5)
-                            for _, r in df_top_util.iterrows():
-                                st.caption(f"**{r[col_folio]}** | {r[col_cliente]} | Util: ${r['UTILIDAD_TOTAL']:,.2f}")
+                with col_r1:
+                    st.markdown("### 💎 Proyectos más Rentables (Utilidad)")
+                    df_top_util = df_stats.sort_values('UTILIDAD_TOTAL', ascending=False).head(5)
+                    for _, r in df_top_util.iterrows():
+                        st.caption(f"**{r[col_folio]}** | {r[col_cliente]} | Util: ${r['UTILIDAD_TOTAL']:,.2f}")
 
-                            st.write("")
-                            st.markdown("### 📈 Top Clientes (Frecuencia)")
-                            df_top_clientes = df_stats[col_cliente].value_counts().head(5).reset_index()
-                            df_top_clientes.columns = ['Cliente', 'Cant']
-                            st.dataframe(df_top_clientes, use_container_width=True, hide_index=True)
+                    st.write("")
+                    st.markdown("### 📈 Top Clientes (Frecuencia)")
+                    df_top_clientes = df_stats[col_cliente].value_counts().head(5).reset_index()
+                    df_top_clientes.columns = ['Cliente', 'Cant']
+                    st.dataframe(df_top_clientes, use_container_width=True, hide_index=True)
 
-                        with col_r2:
-                            st.markdown("### 💰 Proyectos de Mayor Volumen")
-                            df_top_vol = df_stats.sort_values('MONTO_TOTAL', ascending=False).head(5)
-                            for _, r in df_top_vol.iterrows():
-                                st.caption(f"**{r[col_folio]}** | {r[col_cliente]} | Total: ${r['MONTO_TOTAL']:,.2f}")
+                with col_r2:
+                    st.markdown("### 💰 Proyectos de Mayor Volumen")
+                    df_top_vol = df_stats.sort_values('MONTO_TOTAL', ascending=False).head(5)
+                    for _, r in df_top_vol.iterrows():
+                        st.caption(f"**{r[col_folio]}** | {r[col_cliente]} | Total: ${r['MONTO_TOTAL']:,.2f}")
 
-                            st.write("")
-                            # Listar Arrendamientos
-                            st.markdown("### 🏦 Radar de Arrendamientos")
-                            # Buscar en detalle folios que tengan Arrendamiento o Financiamiento
-                            folios_arr = []
-                            if 'FINANCIAMIENTO' in df_det_all.columns:
-                                folios_arr = df_det_all[df_det_all['FINANCIAMIENTO'].isin(['Arrendamiento', 'Financiamiento'])][df_det_all.columns[0]].unique()
+                    st.write("")
+                    # Listar Arrendamientos
+                    st.markdown("### 🏦 Radar de Arrendamientos")
+                    # Buscar en detalle folios que tengan Arrendamiento o Financiamiento
+                    folios_arr = []
+                    if 'FINANCIAMIENTO' in df_det_all.columns:
+                        folios_arr = df_det_all[df_det_all['FINANCIAMIENTO'].isin(['Arrendamiento', 'Financiamiento'])][df_det_all.columns[0]].unique()
 
-                            df_arr = df_stats[df_stats[col_folio].isin(folios_arr)]
-                            if not df_arr.empty:
-                                st.dataframe(df_arr[[col_folio, col_cliente, 'ESTATUS']], use_container_width=True, hide_index=True)
-                            else:
-                                st.info("No hay proyectos con financiera registrados.")
+                    df_arr = df_stats[df_stats[col_folio].isin(folios_arr)]
+                    if not df_arr.empty:
+                        st.dataframe(df_arr[[col_folio, col_cliente, 'ESTATUS']], use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No hay proyectos con financiera registrados.")
 
-                        st.divider()
-                        st.subheader("Historial Detallado")
+                st.divider()
+                st.subheader("Historial Detallado")
 
-                        # Buscador Integrado
-                        busqueda = st.text_input("Buscar por Folio o Cliente:", placeholder="Escribe para filtrar...")
+                # Buscador Integrado
+                busqueda = st.text_input("Buscar por Folio o Cliente:", placeholder="Escribe para filtrar...")
 
-                        if busqueda:
-                            df_filtrado = df_resumen[(df_resumen[col_folio].astype(str).str.contains(busqueda, case=False)) | 
-                                                    (df_resumen[col_cliente].astype(str).str.contains(busqueda, case=False))]
-                        else:
-                            df_filtrado = df_resumen.iloc[::-1] # Todas en reversa
+                if busqueda:
+                    df_filtrado = df_resumen[(df_resumen[col_folio].astype(str).str.contains(busqueda, case=False)) | 
+                                            (df_resumen[col_cliente].astype(str).str.contains(busqueda, case=False))]
+                else:
+                    df_filtrado = df_resumen.iloc[::-1] # Todas en reversa
 
-                        # Clasificación por estatus
-                        estatus_cerrados = ["100% Ganada", "0% Cancelada", "100% Pedido"] # Incluimos Pedido por registros antiguos
-                        df_cerradas = df_filtrado[df_filtrado['ESTATUS'].isin(estatus_cerrados)]
-                        df_abiertas = df_filtrado[~df_filtrado['ESTATUS'].isin(estatus_cerrados)]
+                # Clasificación por estatus
+                estatus_cerrados = ["100% Ganada", "0% Cancelada", "100% Pedido"] # Incluimos Pedido por registros antiguos
+                df_cerradas = df_filtrado[df_filtrado['ESTATUS'].isin(estatus_cerrados)]
+                df_abiertas = df_filtrado[~df_filtrado['ESTATUS'].isin(estatus_cerrados)]
 
-                        t_ab, t_ce = st.tabs([f"Abiertas ({len(df_abiertas)})", f"Cerradas ({len(df_cerradas)})"])
+                t_ab, t_ce = st.tabs([f"Abiertas ({len(df_abiertas)})", f"Cerradas ({len(df_cerradas)})"])
 
-                        def renderizar_lista_cotizaciones(df_fuente):
-                            if df_fuente.empty:
-                                st.info("No hay registros en esta categoría.")
-                                return
+                def renderizar_lista_cotizaciones(df_fuente):
+                    if df_fuente.empty:
+                        st.info("No hay registros en esta categoría.")
+                        return
 
-                            for i, row in df_fuente.iterrows():
-                                f_id = str(row[col_folio]).strip()
-                                # Ignorar si el folio está vacío para evitar errores de Key duplicada
-                                if not f_id or f_id.lower() == "nan":
-                                    continue
+                    for i, row in df_fuente.iterrows():
+                        f_id = str(row[col_folio]).strip()
+                        # Ignorar si el folio está vacío para evitar errores de Key duplicada
+                        if not f_id or f_id.lower() == "nan":
+                            continue
 
-                                # Obtener info del detalle para este folio
-                                det_f = df_det_all[df_det_all[df_det_all.columns[0]].astype(str) == f_id]
+                        # Obtener info del detalle para este folio
+                        det_f = df_det_all[df_det_all[df_det_all.columns[0]].astype(str) == f_id]
 
-                                conceptos = ", ".join([str(x) for x in det_f['CONCEPTO'].unique()]) if 'CONCEPTO' in det_f.columns else "N/A"
-                                proveedores = ", ".join([str(x) for x in det_f['PROVEEDOR'].unique()]) if 'PROVEEDOR' in det_f.columns else "N/A"
-                                estatus = row.get('ESTATUS', 'N/A')
-                                if estatus == 'N/A' and len(row) > 13: estatus = row.iloc[13]
+                        conceptos = ", ".join([str(x) for x in det_f['CONCEPTO'].unique()]) if 'CONCEPTO' in det_f.columns else "N/A"
+                        proveedores = ", ".join([str(x) for x in det_f['PROVEEDOR'].unique()]) if 'PROVEEDOR' in det_f.columns else "N/A"
+                        estatus = row.get('ESTATUS', 'N/A')
+                        if estatus == 'N/A' and len(row) > 13: estatus = row.iloc[13]
 
-                                col_venta = 'PFACTURA_TOTAL_IVA_INC' if 'PFACTURA_TOTAL_IVA_INC' in det_f.columns else det_f.columns[-3]
-                                try: monto_total = pd.to_numeric(det_f[col_venta], errors='coerce').sum()
-                                except: monto_total = 0.0
+                        col_venta = 'PFACTURA_TOTAL_IVA_INC' if 'PFACTURA_TOTAL_IVA_INC' in det_f.columns else det_f.columns[-3]
+                        try: monto_total = pd.to_numeric(det_f[col_venta], errors='coerce').sum()
+                        except: monto_total = 0.0
 
-                                label = f"Folio: {f_id} | {row[col_cliente]} | ${monto_total:,.2f} | {estatus}"
-                                with st.expander(label):
-                                    c1, c2, c3 = st.columns(3)
-                                    c1.write(f"**Fecha Emisión:** {row.get('FECHA_ELABORACION', 'N/A')}")
-                                    c1.write(f"**Estatus:** {estatus}")
+                        label = f"Folio: {f_id} | {row[col_cliente]} | ${monto_total:,.2f} | {estatus}"
+                        with st.expander(label):
+                            c1, c2, c3 = st.columns(3)
+                            c1.write(f"**Fecha Emisión:** {row.get('FECHA_ELABORACION', 'N/A')}")
+                            c1.write(f"**Estatus:** {estatus}")
 
-                                    # --- INFO DE CONTACTO ---
-                                    u_cont = row.get('ULTIMO_CONTACTO', 'N/A')
-                                    dias_oc = calcular_dias(u_cont) if u_cont != 'N/A' else 0
-                                    color_txt = "#E74C3C" if dias_oc > 15 else ("#F39C12" if dias_oc > 7 else "#2ECC71")
-                                    c2.markdown(f"**Último contacto:** {u_cont}")
-                                    c2.markdown(f"**Días sin contacto:** <span style='color:{color_txt}; font-weight:bold;'>{dias_oc} días</span>", unsafe_allow_html=True)
+                            # --- INFO DE CONTACTO ---
+                            u_cont = row.get('ULTIMO_CONTACTO', 'N/A')
+                            dias_oc = calcular_dias(u_cont) if u_cont != 'N/A' else 0
+                            color_txt = "#E74C3C" if dias_oc > 15 else ("#F39C12" if dias_oc > 7 else "#2ECC71")
+                            c2.markdown(f"**Último contacto:** {u_cont}")
+                            c2.markdown(f"**Días sin contacto:** <span style='color:{color_txt}; font-weight:bold;'>{dias_oc} días</span>", unsafe_allow_html=True)
 
-                                    c2.write(f"**Atención:** {row.get('CONTACTO', 'N/A')}")
-                                    c3.write(f"**Monto Total:** ${monto_total:,.2f}")
-                                    c3.write(f"**Productos:** {conceptos}")
-                                    c3.write(f"**Proveedores:** {proveedores}")
+                            c2.write(f"**Atención:** {row.get('CONTACTO', 'N/A')}")
+                            c3.write(f"**Monto Total:** ${monto_total:,.2f}")
+                            c3.write(f"**Productos:** {conceptos}")
+                            c3.write(f"**Proveedores:** {proveedores}")
 
-                                    st.divider()
-                                    c_b1, c_b2, c_b3, c_b4 = st.columns([1, 1, 1, 1])
-                                    with c_b1:
-                                        if st.button(f"Editar {f_id}", key=f"edit_{f_id}", use_container_width=True):
-                                            with st.spinner("Cargando información..."):
-                                                cargar_cotizacion_para_editar(row, df_resumen)
-                                                st.session_state.menu_actual = 'nuevo'
-                                                st.rerun()
-                                    with c_b2:
-                                        # Deshabilitar botón de pedido si ya está cerrada
-                                        btn_disabled = estatus in estatus_cerrados
-                                        if st.button(f"Meter Pedido {f_id}", key=f"ped_{f_id}", type="primary", use_container_width=True, disabled=btn_disabled):
-                                            with st.spinner("Preparando formalización..."):
-                                                cargar_cotizacion_para_editar(row, df_resumen)
-                                                st.session_state.menu_actual = 'pedido'
-                                                st.rerun()
-                                    with c_b3:
-                                        # Botón Cancelar con popover de confirmación
-                                        if not btn_disabled:
-                                            with st.popover("CANCELAR", use_container_width=True):
-                                                st.error(f"¿Confirmas cancelar el folio {f_id}?")
-                                                if st.button("SÍ, CANCELAR (0%)", key=f"canc_{f_id}", use_container_width=True, type="primary"):
+                            st.divider()
+                            c_b1, c_b2, c_b3, c_b4 = st.columns([1, 1, 1, 1])
+                            with c_b1:
+                                if st.button(f"Editar {f_id}", key=f"edit_{f_id}", use_container_width=True):
+                                    with st.spinner("Cargando información..."):
+                                        cargar_cotizacion_para_editar(row, df_resumen)
+                                        st.session_state.menu_actual = 'nuevo'
+                                        st.rerun()
+                            with c_b2:
+                                # Deshabilitar botón de pedido si ya está cerrada
+                                btn_disabled = estatus in estatus_cerrados
+                                if st.button(f"Meter Pedido {f_id}", key=f"ped_{f_id}", type="primary", use_container_width=True, disabled=btn_disabled):
+                                    with st.spinner("Preparando formalización..."):
+                                        cargar_cotizacion_para_editar(row, df_resumen)
+                                        st.session_state.menu_actual = 'pedido'
+                                        st.rerun()
+                            with c_b3:
+                                # Botón Cancelar con popover de confirmación
+                                if not btn_disabled:
+                                    with st.popover("CANCELAR", use_container_width=True):
+                                        st.error(f"¿Confirmas cancelar el folio {f_id}?")
+                                        if st.button("SÍ, CANCELAR (0%)", key=f"canc_{f_id}", use_container_width=True, type="primary"):
+                                            try:
+                                                with st.spinner("Cancelando..."):
+                                                    # Referencia fresca a la hoja
+                                                    ws_res_fresh = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
+                                                    headers = ws_res_fresh.row_values(1)
                                                     try:
-                                                        with st.spinner("Cancelando..."):
-                                                            # Referencia fresca a la hoja
-                                                            ws_res_fresh = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
-                                                            headers = ws_res_fresh.row_values(1)
-                                                            try:
-                                                                col_estatus = headers.index("ESTATUS") + 1
-                                                            except:
-                                                                col_estatus = 14 # Fallback
+                                                        col_estatus = headers.index("ESTATUS") + 1
+                                                    except:
+                                                        col_estatus = 14 # Fallback
 
-                                                            folios_res = ws_res_fresh.col_values(1)
-                                                            if f_id in [str(f) for f in folios_res]:
-                                                                idx_res = [str(f) for f in folios_res].index(f_id) + 1
-                                                                ws_res_fresh.update_cell(idx_res, col_estatus, "0% Cancelada")
-                                                                st.success("Proyecto cancelado")
-                                                                time.sleep(1)
-                                                                st.rerun()
-                                                    except Exception as e: st.error(f"Error al cancelar: {e}")
-                                        else:
-                                            st.button("CANCELAR", use_container_width=True, disabled=True, key=f"btn_canc_dis_{f_id}")
-
-                                    with c_b4:
-                                        with st.popover("ELIMINAR", use_container_width=True):
-                                            st.warning(f"¿Desea eliminar el folio {f_id}?")
-                                            if st.button("CONFIRMAR BORRADO", key=f"del_{f_id}", type="primary", use_container_width=True):
-                                                try:
-                                                    with st.spinner("Eliminando registros..."):
-                                                        folios_res = ws_res.col_values(1)
-                                                        if f_id in [str(f) for f in folios_res]:
-                                                            idx_res = [str(f) for f in folios_res].index(f_id) + 1
-                                                            ws_res.delete_rows(idx_res)
-                                                        folios_det = ws_det.col_values(1)
-                                                        indices_det = [i + 1 for i, val in enumerate(folios_det) if str(val) == f_id]
-                                                        if indices_det:
-                                                            for fila in reversed(indices_det): ws_det.delete_rows(fila)
-                                                        st.success("Eliminada correctamente")
+                                                    folios_res = ws_res_fresh.col_values(1)
+                                                    if f_id in [str(f) for f in folios_res]:
+                                                        idx_res = [str(f) for f in folios_res].index(f_id) + 1
+                                                        ws_res_fresh.update_cell(idx_res, col_estatus, "0% Cancelada")
+                                                        st.success("Proyecto cancelado")
                                                         time.sleep(1)
                                                         st.rerun()
-                                                except Exception as e: st.error(f"Error: {e}")
+                                            except Exception as e: st.error(f"Error al cancelar: {e}")
+                                else:
+                                    st.button("CANCELAR", use_container_width=True, disabled=True, key=f"btn_canc_dis_{f_id}")
 
-                        with t_ab: renderizar_lista_cotizaciones(df_abiertas)
-                        with t_ce: renderizar_lista_cotizaciones(df_cerradas)
+                            with c_b4:
+                                with st.popover("ELIMINAR", use_container_width=True):
+                                    st.warning(f"¿Desea eliminar el folio {f_id}?")
+                                    if st.button("CONFIRMAR BORRADO", key=f"del_{f_id}", type="primary", use_container_width=True):
+                                        try:
+                                            with st.spinner("Eliminando registros..."):
+                                                folios_res = ws_res.col_values(1)
+                                                if f_id in [str(f) for f in folios_res]:
+                                                    idx_res = [str(f) for f in folios_res].index(f_id) + 1
+                                                    ws_res.delete_rows(idx_res)
+                                                folios_det = ws_det.col_values(1)
+                                                indices_det = [i + 1 for i, val in enumerate(folios_det) if str(val) == f_id]
+                                                if indices_det:
+                                                    for fila in reversed(indices_det): ws_det.delete_rows(fila)
+                                                st.success("Eliminada correctamente")
+                                                time.sleep(1)
+                                                st.rerun()
+                                        except Exception as e: st.error(f"Error: {e}")
 
-                    else:
-                        st.info("Aún no tienes cotizaciones registradas. ¡Crea la primera!")
-                except Exception as e:
-                    st.error(f"Error cargando el Dashboard: {e}")
+                with t_ab: renderizar_lista_cotizaciones(df_abiertas)
+                with t_ce: renderizar_lista_cotizaciones(df_cerradas)
+
+            else:
+                st.info("Aún no tienes cotizaciones registradas. ¡Crea la primera!")
+        except Exception as e:
+            st.error(f"Error cargando el Dashboard: {e}")
 
         # --- VISTA: METER PEDIDO (COTIZACIÓN GANADA) ---
         elif st.session_state.menu_actual == 'pedido':
