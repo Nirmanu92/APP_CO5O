@@ -1859,23 +1859,28 @@ def renderizar_gestion_pedidos_central():
                                 target_ej = normalizar(ejecutivo)
                                 datos_ej_rem = next((u for u in st.session_state.usuarios_db if normalizar(u.get('NOMBRE', '')) == target_ej or normalizar(u.get('USUARIO', '')) == target_ej), None)
                                 
-                                if not datos_ej_rem:
-                                    st.error(f"No se encontró la configuración del ejecutivo: {ejecutivo}")
-                                    return
+                                id_sheet_ej = datos_ej_rem.get('ID_SHEET') if datos_ej_rem else None
                                 
-                                id_sheet_ej = datos_ej_rem.get('ID_SHEET')
+                                # --- FALLBACK INTELIGENTE ---
+                                # Si el ejecutivo no tiene hoja, intentamos usar la hoja del usuario actual (Admin/Dirección)
                                 if not id_sheet_ej:
-                                    st.error(f"El ejecutivo {ejecutivo} no tiene una hoja vinculada.")
-                                    return
+                                    if st.session_state.sh_personal:
+                                        sh_ej = st.session_state.sh_personal
+                                    else:
+                                        st.error(f"No se encontró hoja vinculada para {ejecutivo} ni una sesión activa con hoja propia.")
+                                        return
+                                else:
+                                    # Abrir hoja del ejecutivo
+                                    gc_rem = conectar_google_sheets()
+                                    sh_ej = gc_rem.open_by_key(id_sheet_ej)
                                 
-                                # 2. Abrir hoja del ejecutivo y buscar detalles
-                                gc_rem = conectar_google_sheets()
-                                sh_ej = gc_rem.open_by_key(id_sheet_ej)
-                                ws_ej_det = sh_ej.worksheet("PEDIDOS_DETALLE")
-                                data_ej_all = ws_ej_det.get_all_records()
+                                with st.spinner("Buscando partidas del pedido..."):
+                                    ws_ej_det = sh_ej.worksheet("PEDIDOS_DETALLE")
+                                    data_ej_all = ws_ej_det.get_all_records()
                                 
-                                # Filtrar por folio (Columna 1 suele ser Folio)
+                                # Filtrar por folio
                                 df_det_rem = pd.DataFrame([d for d in data_ej_all if str(next(iter(d.values()))).strip() == str(folio)])
+                                ... (resto del procesamiento)
                                 
                                 if not df_det_rem.empty:
                                     # Mapear nombres
