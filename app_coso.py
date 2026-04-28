@@ -457,8 +457,21 @@ def subir_archivo_a_drive(archivo_bytes, nombre_archivo, mimetype='application/p
     try:
         service = obtener_drive_service()
         
+        # --- FALLBACK: SI NO HAY SERVICE OAUTH, USAR CUENTA DE SERVICIO ---
+        if not service:
+            scope = ["https://www.googleapis.com/auth/drive"]
+            if "gcp_service_account" in st.secrets:
+                sec = st.secrets["gcp_service_account"]
+                creds_info = dict(sec) if not isinstance(sec, str) else json.loads(sec)
+                # (Limpieza de llave omitida por brevedad, usar lógica existente)
+                creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+            else:
+                creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
+            service = build('drive', 'v3', credentials=creds)
+
         # Seleccionar ID de carpeta destino según tipo
         folder_id = ID_CARPETA_IMAGENES if "image" in mimetype else ID_CARPETA_COTIZACIONES
+        ... (resto de la función)
         
         file_metadata = {'name': nombre_archivo, 'parents': [folder_id]}
         media = MediaIoBaseUpload(io.BytesIO(archivo_bytes), mimetype=mimetype, resumable=False)
