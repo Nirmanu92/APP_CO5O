@@ -1876,7 +1876,15 @@ def renderizar_gestion_pedidos_central():
                                 
                                 with st.spinner("Buscando partidas del pedido..."):
                                     ws_ej_det = sh_ej.worksheet("PEDIDOS_DETALLE")
-                                    data_ej_all = ws_ej_det.get_all_records()
+                                    # Usar get_all_values y convertir a dict manualmente para evitar error de duplicados en headers
+                                    all_vals_ej = ws_ej_det.get_all_values()
+                                    if len(all_vals_ej) > 1:
+                                        headers_raw_ej = all_vals_ej[0]
+                                        # Limpiar headers: si está vacío poner un nombre genérico
+                                        headers_ej = [h if h.strip() else f"COL_{idx_h}" for idx_h, h in enumerate(headers_raw_ej)]
+                                        data_ej_all = [dict(zip(headers_ej, row_v)) for row_v in all_vals_ej[1:]]
+                                    else:
+                                        data_ej_all = []
                                 
                                 # Filtrar por folio (Validación estricta para ignorar memorándums o celdas intrusas)
                                 df_det_rem = pd.DataFrame([
