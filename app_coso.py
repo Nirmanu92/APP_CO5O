@@ -1809,7 +1809,7 @@ def renderizar_gestion_pedidos_central():
                 
                 # --- BOTONES DE DOCUMENTOS ---
                 st.markdown("**Expediente Digital**")
-                bd1, bd2, bd3, bd4 = st.columns(4)
+                bd1, bd2, bd3, bd4, bd5 = st.columns(5)
                 links = {
                     "TÉCNICO": row.get('PDF_TECNICO'),
                     "PAGO / OC": row.get('COMPROBANTE_RESPALDO'),
@@ -1818,11 +1818,65 @@ def renderizar_gestion_pedidos_central():
                 }
                 
                 for b_idx, (label, link) in enumerate(links.items()):
-                    with [bd1, bd2, bd3, bd4][b_idx]:
+                    with [bd1, bd2, bd3, bd4, bd5][b_idx]:
                         if link and str(link).startswith("http"):
-                            st.link_button(f"📄 ABRIR {label}", link, use_container_width=True)
+                            st.link_button(f"📄 {label}", link, use_container_width=True)
                         else:
-                            st.button(f"🚫 SIN {label}", disabled=True, use_container_width=True, key=f"dis_{i}_{label}")
+                            st.button(f"🚫 {label}", disabled=True, use_container_width=True, key=f"dis_{i}_{label}")
+                
+                # Botón de Remisión
+                with bd5:
+                    if st.button(f"🚚 REMISIÓN", key=f"btn_rem_{i}_{folio}", use_container_width=True, type="primary"):
+                        try:
+                            with st.spinner("Generando Remisión..."):
+                                ws_p_det_rem = sh_p.worksheet("PEDIDOS_DETALLE")
+                                data_det_all = ws_p_det_rem.get_all_records()
+                                # Filtrar por folio (Columna 1 es Folio)
+                                df_det_rem = pd.DataFrame([d for d in data_det_all if str(next(iter(d.values()))).strip() == str(folio)])
+                                
+                                if not df_det_rem.empty:
+                                    # Mapear nombres para que coincidan con lo esperado por generar_remision_blob
+                                    mapa_rem = {
+                                        "CONCEPTO": "Concepto", "DESCRIPCION": "Descripción", "PZAS": "Pzas", "CANTIDAD": "Pzas",
+                                        "FOTO_LINK": "Foto_Link"
+                                    }
+                                    new_cols_rem = {}
+                                    for c_rem in df_det_rem.columns:
+                                        c_norm_rem = str(c_rem).upper().replace(" ", "_")
+                                        if c_norm_rem in mapa_rem: new_cols_rem[c_rem] = mapa_rem[c_norm_rem]
+                                    
+                                    df_det_rem = df_det_rem.rename(columns=new_cols_rem)
+                                    
+                                    # Asegurar columnas mínimas
+                                    for c_req in ["Concepto", "Descripción", "Pzas"]:
+                                        if c_req not in df_det_rem.columns: df_det_rem[c_req] = ""
+                                    
+                                    cab_rem = {
+                                        "folio": folio, "cliente": cliente, "contacto": get_flex(row, 'PERSONA_RECIBE'),
+                                        "ejecutivo": ejecutivo, "email": ""
+                                    }
+                                    
+                                    links_fotos_rem = {}
+                                    if "Foto_Link" in df_det_rem.columns:
+                                        links_fotos_rem = {idx_rem: r_rem["Foto_Link"] for idx_rem, r_rem in df_det_rem.iterrows() if r_rem["Foto_Link"]}
+                                    
+                                    rem_pdf = generar_remision_blob(cab_rem, df_det_rem, {}, links_fotos_rem)
+                                    st.session_state[f"rem_pdf_{folio}"] = rem_pdf
+                                    st.rerun()
+                                else:
+                                    st.error("No se encontraron partidas para este pedido.")
+                        except Exception as e_rem:
+                            st.error(f"Error al generar remisión: {e_rem}")
+
+                if f"rem_pdf_{folio}" in st.session_state:
+                    st.download_button("📥 DESCARGAR REMISIÓN GENERADA", 
+                                     data=st.session_state[f"rem_pdf_{folio}"], 
+                                     file_name=f"REMISION_{folio}.pdf", 
+                                     use_container_width=True, 
+                                     type="primary")
+                    if st.button("Cerrar descarga", key=f"close_rem_{folio}"):
+                        del st.session_state[f"rem_pdf_{folio}"]
+                        st.rerun()
 
                 st.divider()
                 
@@ -2244,6 +2298,9 @@ elif st.session_state.menu_actual == 'pedido':
             "G01 - Adquisición de mercancías", "G03 - Gastos en general", "I04 - Equipo de cómputo", "S01 - Sin efectos fiscales", "CP01 - Pagos"
         ]
         uso_cfdi = st.selectbox("Uso de CFDI:", usos_cfdi)
+    
+    # Campo para números de serie
+    num_series = st.text_area("Números de Serie (si aplica):", placeholder="Ingrese los números de serie separados por coma o renglón...", help="Esta información es útil para la facturación cuando ya se cuenta con los equipos.")
 
     # Mover Condiciones de Pago a una variable interna
     condiciones_pago = st.session_state.get('pago_val', '')
@@ -2474,6 +2531,20 @@ elif st.session_state.menu_actual == 'pedido':
                             idx_l = [str(f) for f in folios_l].index(str(folio_actual)) + 1
                             ws_l.delete_rows(idx_l)
                         guardar_fila_inteligente(ws_l, datos_m)
+
+                        # --- ACTUALIZAR ESTATUS EN COTIZACIONES_RESUMEN ---
+                        try:
+                            ws_res_upd = sh_l.worksheet("COTIZACIONES_RESUMEN")
+                            headers_res = ws_res_upd.row_values(1)
+                            try: col_est = headers_res.index("ESTATUS") + 1
+                            except: col_est = 14
+                            
+                            folios_res = ws_res_upd.col_values(1)
+                            if str(folio_actual) in [str(f) for f in folios_res]:
+                                idx_res = [str(f) for f in folios_res].index(str(folio_actual)) + 1
+                                ws_res_upd.update_cell(idx_res, col_est, "100% Pedido")
+                        except Exception as e_res:
+                            st.warning(f"No se pudo actualizar el estatus de la cotización: {e_res}")
 
                         # Detalle Local
                         try:
@@ -2843,7 +2914,7 @@ elif st.session_state.menu_actual == 'nuevo':
                     st.session_state.coment_val = comentarios
                 
                 with col_fin2:
-                    opciones_estatus = ["1% Planificación", "10% Descubrir", "30% Clasificación", "60% Propuesta", "90% Compromiso", "100% Ganada", "0% Cancelada"]
+                    opciones_estatus = ["1% Planificación", "10% Descubrir", "30% Clasificación", "60% Propuesta", "90% Compromiso", "100% Ganada", "100% Pedido", "0% Cancelada"]
                     val_est_actual = st.session_state.get('estatus_val', '60% Propuesta')
                     idx_est = buscar_index(opciones_estatus, val_est_actual)
                     estatus_sel = st.selectbox("Estatus del Proyecto (Embudo):", opciones_estatus, index=idx_est, key="estatus_sel_final")
