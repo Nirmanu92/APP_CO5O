@@ -1191,26 +1191,21 @@ def cargar_datos_sesion_usuario():
             
             # Abrir su hoja personal (ID_SHEET es el estándar en este proyecto)
             sheet_id = str(datos_user.get('ID_SHEET') or datos_user.get('SPREADSHEET_ID') or "").strip()
-            st.session_state.sh_personal = None # Inicializar como None
+            st.session_state.sh_personal = None 
 
             if sheet_id and len(sheet_id) > 20:
                 try:
                     st.session_state.sh_personal = gc.open_by_key(sheet_id)
-                except Exception as e:
-                    if st.session_state.rol == "EJECUTIVO":
-                        st.error(f"❌ Error al abrir la hoja personal de {st.session_state.usuario}")
-                        st.info(f"Verifique permisos: {e}")
-                        st.stop()
-            else:
-                # Intento por nombre solo para EJECUTIVOS si no hay ID
-                if st.session_state.rol == "EJECUTIVO":
+                except: pass
+
+            # FALLBACK: Si no hay ID o falló, buscar por NOMBRE DE ARCHIVO
+            if st.session_state.sh_personal is None:
+                nombres_intento = [f"COTIZACIONES_{st.session_state.usuario}", st.session_state.usuario]
+                for n in nombres_intento:
                     try:
-                        st.session_state.sh_personal = gc.open(f"COTIZACIONES_{st.session_state.usuario}")
-                    except:
-                        try: st.session_state.sh_personal = gc.open(st.session_state.usuario)
-                        except:
-                            st.error(f"❌ No se encontró hoja personal para {st.session_state.usuario}")
-                            st.stop()
+                        st.session_state.sh_personal = gc.open(n)
+                        break
+                    except: continue
             
             # --- CARGA DE DATOS MAESTROS (PROVEEDORES, TERMINOS, DIRECTORIO) ---
             def cargar_maestro(nombre_ws):
@@ -1665,8 +1660,13 @@ if not st.session_state.autenticado:
                     if datos_user and str(datos_user['PASSWORD']) == pass_input:
                         st.session_state.autenticado = True
                         st.session_state.usuario = user_input
-                        # CARGAR EL ROL (Default: EJECUTIVO)
-                        st.session_state.rol = str(datos_user.get('ROL', 'EJECUTIVO')).upper()
+                        # DETECCIÓN DE ROL MULTI-COLUMNA
+                        rol_encontrado = "EJECUTIVO"
+                        for alias_rol in ["ROL", "PERFIL", "TIPO", "NIVEL", "ACCESO"]:
+                            if alias_rol in datos_user and datos_user[alias_rol]:
+                                rol_encontrado = str(datos_user[alias_rol]).upper()
+                                break
+                        st.session_state.rol = rol_encontrado
                         st.rerun()
                     else:
                         st.error("Credenciales incorrectas")
@@ -2007,8 +2007,45 @@ elif st.session_state.menu_actual == 'menu':
         st.divider()
 
         # 2. CÁLCULO DE MÉTRICAS (KPIs) e HISTORIAL
+        rol_limpio = str(st.session_state.get('rol', 'EJECUTIVO')).strip().upper()
+        
         if st.session_state.sh_personal is None:
-            st.info("💡 Su cuenta no tiene una hoja de cotizaciones personales vinculada. Utilice los botones de navegación superiores para gestionar el sistema.")
+            if rol_limpio in ["DIRECCION", "OPERACIONES", "ADMIN", "DIRECCIÓN"]:
+                st.markdown("### 🌎 Resumen Global de Operaciones")
+                try:
+                    gc_g = conectar_google_sheets()
+                    sh_g = gc_g.open_by_key(ID_SHEET_PEDIDOS)
+                    ws_g = sh_g.sheet1
+                    data_g = ws_g.get_all_records()
+                    df_g = pd.DataFrame(data_g)
+                    
+                    if not df_g.empty:
+                        k1, k2, k3 = st.columns(3)
+                        k1.metric("Pedidos Totales", len(df_g))
+                        k2.metric("Nuevos", len(df_g[df_g['ESTATUS'] == "PEDIDO NUEVO"]))
+                        
+                        # Limpiar y sumar monto global
+                        def limpiar_monto(x):
+                            try: return float(str(x).replace("$","").replace(",","").strip())
+                            except: return 0.0
+                        
+                        monto_g = df_g['MONTO_TOTAL'].apply(limpiar_monto).sum()
+                        k3.metric("Monto Global", f"$ {monto_g:,.2f}")
+                        
+                        st.divider()
+                        st.subheader("Últimos Pedidos del Ecosistema")
+                        # Mostrar los últimos 10 pedidos como historial
+                        cols_mostrar = [c for c in ['FECHA', 'FOLIO', 'CLIENTE', 'EJECUTIVO', 'MONTO_TOTAL', 'ESTATUS'] if c in df_g.columns]
+                        df_display = df_g.iloc[::-1].head(10)[cols_mostrar]
+                        st.dataframe(df_display, use_container_width=True, hide_index=True)
+                        
+                        st.info("💡 Como usuario administrativo, su vista principal es el historial global. Use 'GESTIÓN CENTRAL' para ver detalles y generar remisiones.")
+                    else:
+                        st.info("No hay pedidos registrados en el sistema central aún.")
+                except Exception as e:
+                    st.info(f"💡 Su cuenta administrativa ({rol_limpio}) está lista. Utilice los botones de navegación superiores para gestionar los pedidos globales.")
+            else:
+                st.info("💡 Su cuenta no tiene una hoja de cotizaciones personales vinculada. Utilice los botones de navegación superiores para gestionar el sistema.")
         else:
             try:
                 ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
