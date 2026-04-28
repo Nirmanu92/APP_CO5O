@@ -1880,7 +1880,6 @@ def renderizar_gestion_pedidos_central():
                                 
                                 # Filtrar por folio
                                 df_det_rem = pd.DataFrame([d for d in data_ej_all if str(next(iter(d.values()))).strip() == str(folio)])
-                                ... (resto del procesamiento)
                                 
                                 if not df_det_rem.empty:
                                     # Mapear nombres
@@ -1897,7 +1896,7 @@ def renderizar_gestion_pedidos_central():
                                     
                                     cab_rem = {
                                         "folio": folio, "cliente": cliente, "contacto": get_flex(row, 'PERSONA_RECIBE'),
-                                        "ejecutivo": ejecutivo, "email": datos_ej_rem.get('EMAIL', '')
+                                        "ejecutivo": ejecutivo, "email": datos_ej_rem.get('EMAIL', '') if datos_ej_rem else ""
                                     }
                                     
                                     links_fotos_rem = {}
@@ -1913,7 +1912,7 @@ def renderizar_gestion_pedidos_central():
                                     st.session_state[f"rem_link_{folio}"] = link_rem_drive
                                     st.rerun()
                                 else:
-                                    st.error(f"No se encontraron partidas para el folio {folio} en la hoja de {ejecutivo}.")
+                                    st.error(f"No se encontraron partidas para el folio {folio} en la hoja vinculada.")
                         except Exception as e_rem:
                             st.error(f"Error al generar remisión: {e_rem}")
 
