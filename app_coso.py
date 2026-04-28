@@ -1878,10 +1878,18 @@ def renderizar_gestion_pedidos_central():
                                     ws_ej_det = sh_ej.worksheet("PEDIDOS_DETALLE")
                                     data_ej_all = ws_ej_det.get_all_records()
                                 
-                                # Filtrar por folio
-                                df_det_rem = pd.DataFrame([d for d in data_ej_all if str(next(iter(d.values()))).strip() == str(folio)])
+                                # Filtrar por folio (Validación estricta para ignorar memorándums o celdas intrusas)
+                                df_det_rem = pd.DataFrame([
+                                    d for d in data_ej_all 
+                                    if str(next(iter(d.values()), "")).strip() == str(folio).strip()
+                                    and len(str(next(iter(d.values()), ""))) < 30 # Ignorar celdas con textos larguísimos como folios
+                                ])
                                 
                                 if not df_det_rem.empty:
+                                    # Limpiar datos de celdas para el PDF (Evitar errores de codificación)
+                                    for col_clean in df_det_rem.columns:
+                                        df_det_rem[col_clean] = df_det_rem[col_clean].apply(lambda x: str(x)[:500] if x else "") 
+                                    
                                     # Mapear nombres
                                     mapa_rem = {
                                         "CONCEPTO": "Concepto", "DESCRIPCION": "Descripción", "PZAS": "Pzas", "CANTIDAD": "Pzas",
