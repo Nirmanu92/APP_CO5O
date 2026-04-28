@@ -1829,8 +1829,14 @@ def renderizar_gestion_pedidos_central():
                     if st.button(f"🚚 REMISIÓN", key=f"btn_rem_{i}_{folio}", use_container_width=True, type="primary"):
                         try:
                             with st.spinner("Localizando datos en hoja del ejecutivo..."):
-                                # 1. Buscar al ejecutivo para obtener su ID_SHEET
-                                datos_ej_rem = next((u for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo), None)
+                                # 1. Buscar al ejecutivo de forma flexible
+                                def normalizar(t):
+                                    import unicodedata
+                                    return "".join(c for c in unicodedata.normalize('NFD', str(t)) if unicodedata.category(c) != 'Mn').upper().strip()
+                                
+                                target_ej = normalizar(ejecutivo)
+                                datos_ej_rem = next((u for u in st.session_state.usuarios_db if normalizar(u.get('NOMBRE', '')) == target_ej or normalizar(u.get('USUARIO', '')) == target_ej), None)
+                                
                                 if not datos_ej_rem:
                                     st.error(f"No se encontró la configuración del ejecutivo: {ejecutivo}")
                                     return
