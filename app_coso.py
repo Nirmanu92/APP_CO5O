@@ -1894,21 +1894,38 @@ def renderizar_gestion_pedidos_central():
                                 ])
                                 
                                 if not df_det_rem.empty:
-                                    # Limpiar datos de celdas para el PDF (Evitar errores de codificación)
+                                    # --- MAPEADO INTELIGENTE DE COLUMNAS ---
+                                    def normalizar_header(t):
+                                        import unicodedata
+                                        s = "".join(c for c in unicodedata.normalize('NFD', str(t)) if unicodedata.category(c) != 'Mn')
+                                        return s.upper().replace(" ", "").replace("_", "").replace("-", "").strip()
+
+                                    mapa_final = {}
+                                    for col_real in df_det_rem.columns:
+                                        h_norm = normalizar_header(col_real)
+                                        # Buscar Concepto
+                                        if h_norm in ["CONCEPTO", "PRODUCTO", "ARTICULO", "ITEM", "PARTIDA"]:
+                                            mapa_final[col_real] = "Concepto"
+                                        # Buscar Descripción
+                                        elif h_norm in ["DESCRIPCION", "DETALLE", "ESPECIFICACION"]:
+                                            mapa_final[col_real] = "Descripción"
+                                        # Buscar Piezas
+                                        elif h_norm in ["PZAS", "CANTIDAD", "CANT", "PIEZAS"]:
+                                            mapa_final[col_real] = "Pzas"
+                                        # Buscar Foto
+                                        elif h_norm in ["FOTOLINK", "FOTO", "IMAGEN"]:
+                                            mapa_final[col_real] = "Foto_Link"
+
+                                    df_det_rem = df_det_rem.rename(columns=mapa_final)
+                                    
+                                    # Asegurar columnas mínimas para evitar KeyError
+                                    for c_req in ["Concepto", "Descripción", "Pzas"]:
+                                        if c_req not in df_det_rem.columns:
+                                            df_det_rem[c_req] = "N/A" if c_req != "Pzas" else 1
+
+                                    # Limpiar datos de celdas
                                     for col_clean in df_det_rem.columns:
                                         df_det_rem[col_clean] = df_det_rem[col_clean].apply(lambda x: str(x)[:500] if x else "") 
-                                    
-                                    # Mapear nombres
-                                    mapa_rem = {
-                                        "CONCEPTO": "Concepto", "DESCRIPCION": "Descripción", "PZAS": "Pzas", "CANTIDAD": "Pzas",
-                                        "FOTO_LINK": "Foto_Link"
-                                    }
-                                    new_cols_rem = {}
-                                    for c_rem in df_det_rem.columns:
-                                        c_norm_rem = str(c_rem).upper().replace(" ", "_")
-                                        if c_norm_rem in mapa_rem: new_cols_rem[c_rem] = mapa_rem[c_norm_rem]
-                                    
-                                    df_det_rem = df_det_rem.rename(columns=new_cols_rem)
                                     
                                     cab_rem = {
                                         "folio": folio, "cliente": cliente, "contacto": get_flex(row, 'PERSONA_RECIBE'),
