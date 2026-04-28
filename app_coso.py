@@ -1828,14 +1828,29 @@ def renderizar_gestion_pedidos_central():
                 with bd5:
                     if st.button(f"🚚 REMISIÓN", key=f"btn_rem_{i}_{folio}", use_container_width=True, type="primary"):
                         try:
-                            with st.spinner("Generando Remisión..."):
-                                ws_p_det_rem = sh_p.worksheet("PEDIDOS_DETALLE")
-                                data_det_all = ws_p_det_rem.get_all_records()
-                                # Filtrar por folio (Columna 1 es Folio)
-                                df_det_rem = pd.DataFrame([d for d in data_det_all if str(next(iter(d.values()))).strip() == str(folio)])
+                            with st.spinner("Localizando datos en hoja del ejecutivo..."):
+                                # 1. Buscar al ejecutivo para obtener su ID_SHEET
+                                datos_ej_rem = next((u for u in st.session_state.usuarios_db if u['NOMBRE'] == ejecutivo), None)
+                                if not datos_ej_rem:
+                                    st.error(f"No se encontró la configuración del ejecutivo: {ejecutivo}")
+                                    return
+                                
+                                id_sheet_ej = datos_ej_rem.get('ID_SHEET')
+                                if not id_sheet_ej:
+                                    st.error(f"El ejecutivo {ejecutivo} no tiene una hoja vinculada.")
+                                    return
+                                
+                                # 2. Abrir hoja del ejecutivo y buscar detalles
+                                gc_rem = conectar_google_sheets()
+                                sh_ej = gc_rem.open_by_key(id_sheet_ej)
+                                ws_ej_det = sh_ej.worksheet("PEDIDOS_DETALLE")
+                                data_ej_all = ws_ej_det.get_all_records()
+                                
+                                # Filtrar por folio (Columna 1 suele ser Folio)
+                                df_det_rem = pd.DataFrame([d for d in data_ej_all if str(next(iter(d.values()))).strip() == str(folio)])
                                 
                                 if not df_det_rem.empty:
-                                    # Mapear nombres para que coincidan con lo esperado por generar_remision_blob
+                                    # Mapear nombres
                                     mapa_rem = {
                                         "CONCEPTO": "Concepto", "DESCRIPCION": "Descripción", "PZAS": "Pzas", "CANTIDAD": "Pzas",
                                         "FOTO_LINK": "Foto_Link"
@@ -1847,13 +1862,9 @@ def renderizar_gestion_pedidos_central():
                                     
                                     df_det_rem = df_det_rem.rename(columns=new_cols_rem)
                                     
-                                    # Asegurar columnas mínimas
-                                    for c_req in ["Concepto", "Descripción", "Pzas"]:
-                                        if c_req not in df_det_rem.columns: df_det_rem[c_req] = ""
-                                    
                                     cab_rem = {
                                         "folio": folio, "cliente": cliente, "contacto": get_flex(row, 'PERSONA_RECIBE'),
-                                        "ejecutivo": ejecutivo, "email": ""
+                                        "ejecutivo": ejecutivo, "email": datos_ej_rem.get('EMAIL', '')
                                     }
                                     
                                     links_fotos_rem = {}
@@ -1861,21 +1872,34 @@ def renderizar_gestion_pedidos_central():
                                         links_fotos_rem = {idx_rem: r_rem["Foto_Link"] for idx_rem, r_rem in df_det_rem.iterrows() if r_rem["Foto_Link"]}
                                     
                                     rem_pdf = generar_remision_blob(cab_rem, df_det_rem, {}, links_fotos_rem)
+                                    
+                                    # 3. Subir a Drive para que quede evidencia
+                                    link_rem_drive = subir_archivo_a_drive(rem_pdf, f"REMISION_{folio}.pdf", 'application/pdf')
+                                    
                                     st.session_state[f"rem_pdf_{folio}"] = rem_pdf
+                                    st.session_state[f"rem_link_{folio}"] = link_rem_drive
                                     st.rerun()
                                 else:
-                                    st.error("No se encontraron partidas para este pedido.")
+                                    st.error(f"No se encontraron partidas para el folio {folio} en la hoja de {ejecutivo}.")
                         except Exception as e_rem:
                             st.error(f"Error al generar remisión: {e_rem}")
 
                 if f"rem_pdf_{folio}" in st.session_state:
-                    st.download_button("📥 DESCARGAR REMISIÓN GENERADA", 
-                                     data=st.session_state[f"rem_pdf_{folio}"], 
-                                     file_name=f"REMISION_{folio}.pdf", 
-                                     use_container_width=True, 
-                                     type="primary")
+                    c_down1, c_down2 = st.columns(2)
+                    with c_down1:
+                        st.download_button("📥 DESCARGAR PDF", 
+                                         data=st.session_state[f"rem_pdf_{folio}"], 
+                                         file_name=f"REMISION_{folio}.pdf", 
+                                         use_container_width=True, 
+                                         type="primary")
+                    with c_down2:
+                        link_r = st.session_state.get(f"rem_link_{folio}")
+                        if link_r:
+                            st.link_button("📂 VER EN DRIVE", link_r, use_container_width=True)
+                    
                     if st.button("Cerrar descarga", key=f"close_rem_{folio}"):
                         del st.session_state[f"rem_pdf_{folio}"]
+                        if f"rem_link_{folio}" in st.session_state: del st.session_state[f"rem_link_{folio}"]
                         st.rerun()
 
                 st.divider()
