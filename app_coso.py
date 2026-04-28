@@ -461,17 +461,26 @@ def subir_archivo_a_drive(archivo_bytes, nombre_archivo, mimetype='application/p
         if not service:
             scope = ["https://www.googleapis.com/auth/drive"]
             if "gcp_service_account" in st.secrets:
-                sec = st.secrets["gcp_service_account"]
-                creds_info = dict(sec) if not isinstance(sec, str) else json.loads(sec)
-                # (Limpieza de llave omitida por brevedad, usar lógica existente)
-                creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+                try:
+                    sec = st.secrets["gcp_service_account"]
+                    creds_info = dict(sec) if not isinstance(sec, str) else json.loads(sec)
+                    if "private_key" in creds_info:
+                        pk = str(creds_info["private_key"])
+                        pk = pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
+                        pk = pk.replace("\\n", "").replace("\n", "").replace(" ", "").strip()
+                        pk_clean = "-----BEGIN PRIVATE KEY-----\n"
+                        for i in range(0, len(pk), 64): pk_clean += pk[i:i+64] + "\n"
+                        pk_clean += "-----END PRIVATE KEY-----\n"
+                        creds_info["private_key"] = pk_clean
+                    creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+                except:
+                    creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
             else:
                 creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
             service = build('drive', 'v3', credentials=creds)
 
         # Seleccionar ID de carpeta destino según tipo
         folder_id = ID_CARPETA_IMAGENES if "image" in mimetype else ID_CARPETA_COTIZACIONES
-        ... (resto de la función)
         
         file_metadata = {'name': nombre_archivo, 'parents': [folder_id]}
         media = MediaIoBaseUpload(io.BytesIO(archivo_bytes), mimetype=mimetype, resumable=False)
@@ -482,7 +491,7 @@ def subir_archivo_a_drive(archivo_bytes, nombre_archivo, mimetype='application/p
             fields='id, webViewLink'
         ).execute()
         
-        # Intentar dar permisos de lectura a cualquiera con el link (opcional en cuentas personales)
+        # Intentar dar permisos de lectura a cualquiera con el link
         try:
             service.permissions().create(
                 fileId=file.get('id'), 
