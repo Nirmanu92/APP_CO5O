@@ -897,7 +897,11 @@ def generar_remision_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
         pdf.rect(15, y_antes, 180, h_fila, "F")
 
         pdf.set_font("helvetica", "B", 10)
-        pdf.cell(w_cant, h_fila, str(int(row['Pzas'])), 0, 0, "C")
+        try:
+            cant_val = str(int(pd.to_numeric(row['Pzas'], errors='coerce') or 1))
+        except:
+            cant_val = str(row['Pzas'])
+        pdf.cell(w_cant, h_fila, cant_val, 0, 0, "C")
         
         x_desc = pdf.get_x()
         pdf.set_xy(x_desc + 2, y_antes + 4)
