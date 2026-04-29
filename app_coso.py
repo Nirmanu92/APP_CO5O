@@ -1880,21 +1880,33 @@ def renderizar_gestion_pedidos_central():
                                 
                                 with st.spinner("Buscando partidas del pedido..."):
                                     ws_ej_det = sh_ej.worksheet("PEDIDOS_DETALLE")
-                                    # Usar get_all_values y convertir a dict manualmente para evitar error de duplicados en headers
                                     all_vals_ej = ws_ej_det.get_all_values()
-                                    if len(all_vals_ej) > 1:
-                                        headers_raw_ej = all_vals_ej[0]
-                                        # Limpiar headers: si está vacío poner un nombre genérico
-                                        headers_ej = [h if h.strip() else f"COL_{idx_h}" for idx_h, h in enumerate(headers_raw_ej)]
-                                        data_ej_all = [dict(zip(headers_ej, row_v)) for row_v in all_vals_ej[1:]]
+                                    
+                                    if len(all_vals_ej) > 0:
+                                        first_row = all_vals_ej[0]
+                                        # DETECTAR SI HAY HEADERS O ES DATA DIRECTA
+                                        # Si la primera celda tiene un guión y números, es un folio (Data), no un header.
+                                        es_data = "-" in str(first_row[0]) and any(c.isdigit() for c in str(first_row[0]))
+                                        
+                                        if es_data:
+                                            # No hay headers, usar el orden conocido en el que escribimos
+                                            headers_ej = ["FOLIO", "TIPO", "CONCEPTO", "DESCRIPCION", "PZAS", "SKU", "PROVEEDOR", "LINK", "EJ_PROV", "COSTO", "VENTA", "UTIL", "FECHA"]
+                                            # Rellenar si hay más columnas
+                                            if len(first_row) > len(headers_ej):
+                                                headers_ej += [f"COL_{i}" for i in range(len(headers_ej), len(first_row))]
+                                            data_ej_all = [dict(zip(headers_ej, row_v)) for row_v in all_vals_ej]
+                                        else:
+                                            # Hay headers, procesar normal
+                                            headers_raw_ej = first_row
+                                            headers_ej = [h if h.strip() else f"COL_{idx_h}" for idx_h, h in enumerate(headers_raw_ej)]
+                                            data_ej_all = [dict(zip(headers_ej, row_v)) for row_v in all_vals_ej[1:]]
                                     else:
                                         data_ej_all = []
                                 
-                                # Filtrar por folio (Validación estricta para ignorar memorándums o celdas intrusas)
+                                # Filtrar por folio (Validación estricta)
                                 df_det_rem = pd.DataFrame([
                                     d for d in data_ej_all 
                                     if str(next(iter(d.values()), "")).strip() == str(folio).strip()
-                                    and len(str(next(iter(d.values()), ""))) < 30 # Ignorar celdas con textos larguísimos como folios
                                 ])
                                 
                                 if not df_det_rem.empty:
@@ -1907,8 +1919,8 @@ def renderizar_gestion_pedidos_central():
                                     mapa_final = {}
                                     for col_real in df_det_rem.columns:
                                         h_norm = normalizar_header(col_real)
-                                        # Buscar Concepto
-                                        if h_norm in ["CONCEPTO", "PRODUCTO", "ARTICULO", "ITEM", "PARTIDA"]:
+                                        # Buscar Concepto (QUITAMOS PARTIDA de aquí)
+                                        if h_norm in ["CONCEPTO", "PRODUCTO", "ARTICULO", "ITEM"]:
                                             mapa_final[col_real] = "Concepto"
                                         # Buscar Descripción
                                         elif h_norm in ["DESCRIPCION", "DETALLE", "ESPECIFICACION"]:
