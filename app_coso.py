@@ -1889,16 +1889,24 @@ def renderizar_gestion_pedidos_central():
                                         es_data = "-" in str(first_row[0]) and any(c.isdigit() for c in str(first_row[0]))
                                         
                                         if es_data:
-                                            # No hay headers, usar el orden conocido en el que escribimos
-                                            headers_ej = ["FOLIO", "TIPO", "CONCEPTO", "DESCRIPCION", "PZAS", "SKU", "PROVEEDOR", "LINK", "EJ_PROV", "COSTO", "VENTA", "UTIL", "FECHA"]
-                                            # Rellenar si hay más columnas
+                                            # Ajuste según especificación del usuario: C=Concepto, D=Desc, E=Pzas, Z=Foto
+                                            headers_ej = ["FOLIO", "TIPO", "CONCEPTO", "DESCRIPCION", "PZAS"] + ["N/A"]*20 + ["FOTO_LINK"]
+                                            # Rellenar hasta alcanzar el ancho de la fila real si es necesario
                                             if len(first_row) > len(headers_ej):
-                                                headers_ej += [f"COL_{i}" for i in range(len(headers_ej), len(first_row))]
+                                                for extra in range(len(headers_ej), len(first_row)):
+                                                    headers_ej.append(f"COL_{extra}")
+                                            
                                             data_ej_all = [dict(zip(headers_ej, row_v)) for row_v in all_vals_ej]
                                         else:
-                                            # Hay headers, procesar normal
+                                            # Si hay headers, procesar normal pero asegurar que FOTO_LINK sea la col 26 (Z)
                                             headers_raw_ej = first_row
-                                            headers_ej = [h if h.strip() else f"COL_{idx_h}" for idx_h, h in enumerate(headers_raw_ej)]
+                                            headers_ej = []
+                                            for idx_h, h in enumerate(headers_raw_ej):
+                                                h_txt = h.strip()
+                                                if not h_txt:
+                                                    if idx_h == 25: h_txt = "FOTO_LINK"
+                                                    else: h_txt = f"COL_{idx_h}"
+                                                headers_ej.append(h_txt)
                                             data_ej_all = [dict(zip(headers_ej, row_v)) for row_v in all_vals_ej[1:]]
                                     else:
                                         data_ej_all = []
