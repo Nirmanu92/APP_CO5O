@@ -609,14 +609,26 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     partidas_pdf = []
     current_p = None
     for _, row in df_partidas.iterrows():
-        tipo = row.get("Tipo", "PARTIDA")
-        if tipo == "PARTIDA":
+        tipo = str(row.get("Tipo", "PARTIDA")).upper().strip()
+        if tipo in ["PARTIDA", "COMPONENTE"]:
             if current_p is not None: partidas_pdf.append(current_p)
             current_p = row.copy()
+            current_p["Descripción"] = str(current_p.get("Descripción", ""))
         else:
             if current_p is not None:
-                current_p["Venta (Sub)"] += row["Venta (Sub)"]
-                current_p["Venta (IVA)"] += row["Venta (IVA)"]
+                # Sumar valores financieros si existen
+                if "Venta (Sub)" in current_p and "Venta (Sub)" in row:
+                    current_p["Venta (Sub)"] += row["Venta (Sub)"]
+                if "Venta (IVA)" in current_p and "Venta (IVA)" in row:
+                    current_p["Venta (IVA)"] += row["Venta (IVA)"]
+                
+                # Concatenar texto de detalles
+                extra_c = str(row.get("Concepto", "")).strip()
+                extra_d = str(row.get("Descripción", "")).strip()
+                texto_adicional = f"\n- {extra_c}"
+                if extra_d:
+                    texto_adicional += f": {extra_d}"
+                current_p["Descripción"] += texto_adicional
             else:
                 partidas_pdf.append(row.copy())
     if current_p is not None: partidas_pdf.append(current_p)
@@ -721,7 +733,11 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
         pdf.line(10, y_antes + h_fila, 205, y_antes + h_fila)
 
         pdf.set_font("helvetica", "B", 8)
-        pdf.cell(w_cant, h_fila, str(int(row['Pzas'])), 0, 0, "C")
+        try:
+            cant_val = str(int(pd.to_numeric(row['Pzas'], errors='coerce') or 1))
+        except:
+            cant_val = str(row['Pzas'])
+        pdf.cell(w_cant, h_fila, cant_val, 0, 0, "C")
         
         # Descripción
         x_d = pdf.get_x()
@@ -817,13 +833,22 @@ def generar_remision_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     partidas_pdf = []
     current_p = None
     for _, row in df_partidas.iterrows():
-        tipo = row.get("Tipo", "PARTIDA")
-        if tipo == "PARTIDA":
+        tipo = str(row.get("Tipo", "PARTIDA")).upper().strip()
+        if tipo in ["PARTIDA", "COMPONENTE"]:
             if current_p is not None: partidas_pdf.append(current_p)
             current_p = row.copy()
+            current_p["Descripción"] = str(current_p.get("Descripción", ""))
         else:
-            if current_p is not None: pass # En remisión solo importa la partida principal
-            else: partidas_pdf.append(row.copy())
+            if current_p is not None:
+                # En remisión, concatenamos los detalles (Características/Notas) al cuerpo de la descripción
+                extra_c = str(row.get("Concepto", "")).strip()
+                extra_d = str(row.get("Descripción", "")).strip()
+                texto_adicional = f"\n- {extra_c}"
+                if extra_d:
+                    texto_adicional += f": {extra_d}"
+                current_p["Descripción"] += texto_adicional
+            else:
+                partidas_pdf.append(row.copy())
     if current_p is not None: partidas_pdf.append(current_p)
     df_pdf = pd.DataFrame(partidas_pdf)
 
@@ -1067,7 +1092,11 @@ def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, dato
         pdf.rect(15, y_antes, 185, h_fila, "F")
 
         pdf.set_font("helvetica", "B", 8)
-        pdf.cell(w_cant, h_fila, str(int(row['Pzas'])), 0, 0, "C")
+        try:
+            cant_val = str(int(pd.to_numeric(row['Pzas'], errors='coerce') or 1))
+        except:
+            cant_val = str(row['Pzas'])
+        pdf.cell(w_cant, h_fila, cant_val, 0, 0, "C")
         
         x_desc = pdf.get_x()
         pdf.set_xy(x_desc + 2, y_antes + 2)
@@ -1301,6 +1330,20 @@ def cargar_datos_sesion_usuario():
                             if data: return normalizar_registros(data)
                         except: continue
                 
+                # 3. FALLBACK: Si no se encontró en la personal, intentar en el archivo maestro central
+                # Esto es vital para nuevos ejecutivos que aún no tienen su propio directorio personal.
+                if nombre_ws in ["DIRECTORIO", "DATOS FISCALES"]:
+                    try:
+                        sh_m = gc.open_by_key("1YJWY1C2OYpGypTyYWrXJRIZTU9jFwC_cvBwLNp2aQDE")
+                        # Probar nombres comunes de pestañas para el fallback
+                        for p_nombre in [nombre_ws, "DIRECTORIO", "DATOS FISCALES", "CLIENTES", "Hoja 1"]:
+                            try:
+                                ws_m = sh_m.worksheet(p_nombre)
+                                data_m = ws_m.get_all_records()
+                                if data_m: return normalizar_registros(data_m)
+                            except: continue
+                    except: pass
+
                 return []
 
             st.session_state.directorio = cargar_maestro("DIRECTORIO")
@@ -1883,72 +1926,33 @@ def renderizar_gestion_pedidos_central():
                                     all_vals_ej = ws_ej_det.get_all_values()
                                     
                                     if len(all_vals_ej) > 0:
-                                        first_row = all_vals_ej[0]
-                                        # DETECTAR SI HAY HEADERS O ES DATA DIRECTA
-                                        # Si la primera celda tiene un guión y números, es un folio (Data), no un header.
-                                        es_data = "-" in str(first_row[0]) and any(c.isdigit() for c in str(first_row[0]))
-                                        
-                                        if es_data:
-                                            # Ajuste según especificación del usuario: C=Concepto, D=Desc, E=Pzas, Z=Foto
-                                            headers_ej = ["FOLIO", "TIPO", "CONCEPTO", "DESCRIPCION", "PZAS"] + ["N/A"]*20 + ["FOTO_LINK"]
-                                            # Rellenar hasta alcanzar el ancho de la fila real si es necesario
-                                            if len(first_row) > len(headers_ej):
-                                                for extra in range(len(headers_ej), len(first_row)):
-                                                    headers_ej.append(f"COL_{extra}")
-                                            
-                                            data_ej_all = [dict(zip(headers_ej, row_v)) for row_v in all_vals_ej]
-                                        else:
-                                            # Si hay headers, procesar normal pero asegurar que FOTO_LINK sea la col 26 (Z)
-                                            headers_raw_ej = first_row
-                                            headers_ej = []
-                                            for idx_h, h in enumerate(headers_raw_ej):
-                                                h_txt = h.strip()
-                                                if not h_txt:
-                                                    if idx_h == 25: h_txt = "FOTO_LINK"
-                                                    else: h_txt = f"COL_{idx_h}"
-                                                headers_ej.append(h_txt)
-                                            data_ej_all = [dict(zip(headers_ej, row_v)) for row_v in all_vals_ej[1:]]
+                                        # Usamos un mapeo directo por posición para cumplir con C, D, E y Z
+                                        # Col A=0, B=1, C=2, D=3, E=4 ... Z=25
+                                        data_ej_all = []
+                                        for row_v in all_vals_ej:
+                                            if len(row_v) < 5: continue
+                                            d_row = {
+                                                "Folio": str(row_v[0]).strip(),
+                                                "Tipo": str(row_v[1]).strip(),
+                                                "Concepto": str(row_v[2]).strip(),
+                                                "Descripción": str(row_v[3]).strip(),
+                                                "Pzas": row_v[4],
+                                                "Foto_Link": row_v[25] if len(row_v) > 25 else ""
+                                            }
+                                            data_ej_all.append(d_row)
                                     else:
                                         data_ej_all = []
                                 
                                 # Filtrar por folio (Validación estricta)
                                 df_det_rem = pd.DataFrame([
                                     d for d in data_ej_all 
-                                    if str(next(iter(d.values()), "")).strip() == str(folio).strip()
+                                    if str(d["Folio"]).strip() == str(folio).strip()
+                                    and str(d["Tipo"]).upper() != "TIPO" # Ignorar encabezado si existe
                                 ])
                                 
                                 if not df_det_rem.empty:
-                                    # --- MAPEADO INTELIGENTE DE COLUMNAS ---
-                                    def normalizar_header(t):
-                                        import unicodedata
-                                        s = "".join(c for c in unicodedata.normalize('NFD', str(t)) if unicodedata.category(c) != 'Mn')
-                                        return s.upper().replace(" ", "").replace("_", "").replace("-", "").strip()
-
-                                    mapa_final = {}
-                                    for col_real in df_det_rem.columns:
-                                        h_norm = normalizar_header(col_real)
-                                        # Buscar Concepto (QUITAMOS PARTIDA de aquí)
-                                        if h_norm in ["CONCEPTO", "PRODUCTO", "ARTICULO", "ITEM"]:
-                                            mapa_final[col_real] = "Concepto"
-                                        # Buscar Descripción
-                                        elif h_norm in ["DESCRIPCION", "DETALLE", "ESPECIFICACION"]:
-                                            mapa_final[col_real] = "Descripción"
-                                        # Buscar Piezas
-                                        elif h_norm in ["PZAS", "CANTIDAD", "CANT", "PIEZAS"]:
-                                            mapa_final[col_real] = "Pzas"
-                                        # Buscar Foto
-                                        elif h_norm in ["FOTOLINK", "FOTO", "IMAGEN"]:
-                                            mapa_final[col_real] = "Foto_Link"
-
-                                    df_det_rem = df_det_rem.rename(columns=mapa_final)
-                                    
-                                    # Asegurar columnas mínimas para evitar KeyError
-                                    for c_req in ["Concepto", "Descripción", "Pzas"]:
-                                        if c_req not in df_det_rem.columns:
-                                            df_det_rem[c_req] = "N/A" if c_req != "Pzas" else 1
-
                                     # Limpiar datos de celdas
-                                    for col_clean in df_det_rem.columns:
+                                    for col_clean in ["Concepto", "Descripción", "Pzas"]:
                                         df_det_rem[col_clean] = df_det_rem[col_clean].apply(lambda x: str(x)[:500] if x else "") 
                                     
                                     cab_rem = {
@@ -1956,9 +1960,7 @@ def renderizar_gestion_pedidos_central():
                                         "ejecutivo": ejecutivo, "email": datos_ej_rem.get('EMAIL', '') if datos_ej_rem else ""
                                     }
                                     
-                                    links_fotos_rem = {}
-                                    if "Foto_Link" in df_det_rem.columns:
-                                        links_fotos_rem = {idx_rem: r_rem["Foto_Link"] for idx_rem, r_rem in df_det_rem.iterrows() if r_rem["Foto_Link"]}
+                                    links_fotos_rem = {idx_rem: r_rem["Foto_Link"] for idx_rem, r_rem in df_det_rem.iterrows() if r_rem.get("Foto_Link")}
                                     
                                     rem_pdf = generar_remision_blob(cab_rem, df_det_rem, {}, links_fotos_rem)
                                     

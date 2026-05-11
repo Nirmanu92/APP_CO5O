@@ -563,14 +563,26 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     partidas_pdf = []
     current_p = None
     for _, row in df_partidas.iterrows():
-        tipo = row.get("Tipo", "PARTIDA")
-        if tipo == "PARTIDA":
+        tipo = str(row.get("Tipo", "PARTIDA")).upper().strip()
+        if tipo in ["PARTIDA", "COMPONENTE"]:
             if current_p is not None: partidas_pdf.append(current_p)
             current_p = row.copy()
+            current_p["Descripción"] = str(current_p.get("Descripción", ""))
         else:
             if current_p is not None:
-                current_p["Venta (Sub)"] += row["Venta (Sub)"]
-                current_p["Venta (IVA)"] += row["Venta (IVA)"]
+                # Sumar valores financieros si existen
+                if "Venta (Sub)" in current_p and "Venta (Sub)" in row:
+                    current_p["Venta (Sub)"] += row["Venta (Sub)"]
+                if "Venta (IVA)" in current_p and "Venta (IVA)" in row:
+                    current_p["Venta (IVA)"] += row["Venta (IVA)"]
+                
+                # Concatenar texto de detalles
+                extra_c = str(row.get("Concepto", "")).strip()
+                extra_d = str(row.get("Descripción", "")).strip()
+                texto_adicional = f"\n- {extra_c}"
+                if extra_d:
+                    texto_adicional += f": {extra_d}"
+                current_p["Descripción"] += texto_adicional
             else:
                 partidas_pdf.append(row.copy())
     if current_p is not None: partidas_pdf.append(current_p)
@@ -675,7 +687,11 @@ def generar_pdf_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
         pdf.line(10, y_antes + h_fila, 205, y_antes + h_fila)
 
         pdf.set_font("helvetica", "B", 8)
-        pdf.cell(w_cant, h_fila, str(int(row['Pzas'])), 0, 0, "C")
+        try:
+            cant_val = str(int(pd.to_numeric(row['Pzas'], errors='coerce') or 1))
+        except:
+            cant_val = str(row['Pzas'])
+        pdf.cell(w_cant, h_fila, cant_val, 0, 0, "C")
         
         # Descripción
         x_d = pdf.get_x()
@@ -771,13 +787,22 @@ def generar_remision_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
     partidas_pdf = []
     current_p = None
     for _, row in df_partidas.iterrows():
-        tipo = row.get("Tipo", "PARTIDA")
-        if tipo == "PARTIDA":
+        tipo = str(row.get("Tipo", "PARTIDA")).upper().strip()
+        if tipo in ["PARTIDA", "COMPONENTE"]:
             if current_p is not None: partidas_pdf.append(current_p)
             current_p = row.copy()
+            current_p["Descripción"] = str(current_p.get("Descripción", ""))
         else:
-            if current_p is not None: pass # En remisión solo importa la partida principal
-            else: partidas_pdf.append(row.copy())
+            if current_p is not None:
+                # En remisión, concatenamos los detalles (Características/Notas) al cuerpo de la descripción
+                extra_c = str(row.get("Concepto", "")).strip()
+                extra_d = str(row.get("Descripción", "")).strip()
+                texto_adicional = f"\n- {extra_c}"
+                if extra_d:
+                    texto_adicional += f": {extra_d}"
+                current_p["Descripción"] += texto_adicional
+            else:
+                partidas_pdf.append(row.copy())
     if current_p is not None: partidas_pdf.append(current_p)
     df_pdf = pd.DataFrame(partidas_pdf)
 
@@ -851,7 +876,11 @@ def generar_remision_blob(datos_cab, df_partidas, dict_fotos, dict_links={}):
         pdf.rect(15, y_antes, 180, h_fila, "F")
 
         pdf.set_font("helvetica", "B", 10)
-        pdf.cell(w_cant, h_fila, str(int(row['Pzas'])), 0, 0, "C")
+        try:
+            cant_val = str(int(pd.to_numeric(row['Pzas'], errors='coerce') or 1))
+        except:
+            cant_val = str(row['Pzas'])
+        pdf.cell(w_cant, h_fila, cant_val, 0, 0, "C")
         
         x_desc = pdf.get_x()
         pdf.set_xy(x_desc + 2, y_antes + 4)
@@ -1010,7 +1039,11 @@ def generar_pedido_tecnico_blob_v2(cab, df_partidas, datos_fisc, datos_log, dato
         pdf.rect(15, y_antes, 185, h_fila, "F")
 
         pdf.set_font("helvetica", "B", 8)
-        pdf.cell(w_cant, h_fila, str(int(row['Pzas'])), 0, 0, "C")
+        try:
+            cant_val = str(int(pd.to_numeric(row['Pzas'], errors='coerce') or 1))
+        except:
+            cant_val = str(row['Pzas'])
+        pdf.cell(w_cant, h_fila, cant_val, 0, 0, "C")
         
         x_desc = pdf.get_x()
         pdf.set_xy(x_desc + 2, y_antes + 2)
