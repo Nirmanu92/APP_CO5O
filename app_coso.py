@@ -102,7 +102,7 @@ def obtener_datos_maestros_cached(nombre_archivo, nombre_ws="sheet1"):
     except:
         return []
 
-@st.cache_data(ttl=300) # Guardar escaneo OVO por 5 minutos
+@st.cache_data(ttl=300) # Guardar escaneo por 5 minutos
 def obtener_directorio_ejecutivo_cached(sheet_id, usuario_id):
     """Lee el directorio de un ejecutivo específico con caché."""
     try:
@@ -1495,7 +1495,7 @@ def cargar_cotizacion_para_editar(row, df_resumen):
     except Exception as e:
         st.error(f"Error cargando detalle: {e}")
 
-# --- 3. BUSCADOR DE VÍNCULOS Y OPERACIONES (OVO) ---
+# --- 3. BUSCADOR DE VÍNCULOS Y OPERACIONES ---
 def buscar_en_todos_los_sheets(query):
     """Busca coincidencias ignorando acentos, puntuación y mayúsculas."""
     import unicodedata
@@ -1544,7 +1544,7 @@ def buscar_en_todos_los_sheets(query):
     
     return resultados
 
-def renderizar_buscador_ovo():
+def renderizar_buscador_vinculos():
     st.title("🔎 Buscador de Vínculos y Operaciones")
     st.info("Escribe el nombre de la empresa o contacto para verificar disponibilidad.")
     
@@ -1998,8 +1998,8 @@ def renderizar_gestion_pedidos_central():
         st.error(f"Error al cargar gestión de pedidos: {e}")
 
 # --- NAVEGACIÓN DE VISTAS ---
-if st.session_state.menu_actual == 'ovo':
-    renderizar_buscador_ovo()
+if st.session_state.menu_actual == 'vinculos':
+    renderizar_buscador_vinculos()
 elif st.session_state.menu_actual == 'gestion_pedidos':
     renderizar_gestion_pedidos_central()
 
@@ -2013,8 +2013,8 @@ elif st.session_state.menu_actual == 'menu':
                 st.session_state.menu_actual = 'gestion_pedidos'
                 st.rerun()
         with col_acc2:
-            if st.button("🔎 BUSCADOR OVO", use_container_width=True):
-                st.session_state.menu_actual = 'ovo'
+            if st.button("🔎 BUSCADOR DE VÍNCULOS", use_container_width=True):
+                st.session_state.menu_actual = 'vinculos'
                 st.rerun()
         st.divider()
         st.info("Bienvenido. Selecciona una opción para gestionar los pedidos del ecosistema.")
@@ -2028,8 +2028,8 @@ elif st.session_state.menu_actual == 'menu':
                 st.session_state.menu_actual = 'nuevo'
                 st.rerun()
         with col_acc2:
-            if st.button("Buscador OVO", use_container_width=True):
-                st.session_state.menu_actual = 'ovo'
+            if st.button("Buscador de Vínculos", use_container_width=True):
+                st.session_state.menu_actual = 'vinculos'
                 st.rerun()
         
         # Botón extra solo para DIRECCION
