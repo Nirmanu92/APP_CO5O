@@ -35,9 +35,9 @@ from PIL import Image
 # --- CONFIGURACIÓN UI (DEBE SER LO PRIMERO) ---
 try:
     img_favicon = Image.open("ICONO.png")
-    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon=img_favicon, layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="Registro Maestro", page_icon=img_favicon, layout="wide", initial_sidebar_state="expanded")
 except:
-    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon="ICONO.png", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="Registro Maestro", page_icon="ICONO.png", layout="wide", initial_sidebar_state="expanded")
 
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -1687,13 +1687,6 @@ if not st.session_state.autenticado:
     with col_l2:
         st.write("") 
         st.write("")
-        if os.path.exists("LOGOPURO.png"):
-            # Logo al 50% de ancho del contenedor central
-            _, mid_logo, _ = st.columns([1, 2, 1])
-            with mid_logo:
-                st.image("LOGOPURO.png", use_container_width=True)
-        else:
-            st.title("CO5O")
         
         with st.form("form_login"):
             st.markdown("<h3 style='text-align: center; color: #1F497D;'>Acceso al Sistema</h3>", unsafe_allow_html=True)
@@ -1726,23 +1719,6 @@ if not st.session_state.autenticado:
                 st.image("CONSULTINGLOGO.png", use_container_width=True)
     st.stop()
 else:
-    # --- MOSTRAR BANNER DINÁMICO ---
-    def obtener_banner_dinamico():
-        ahora = ahora_mexico()
-        hora = ahora.hour
-        if 6 <= hora < 12: prefijo = "DIA"
-        elif 12 <= hora < 19: prefijo = "TARDE"
-        else: prefijo = "NOCHE"
-        
-        # Intentar banner específico por horario, si no el general
-        for b in [f"BANNER_{prefijo}.png", "BANNER_TOP.png"]:
-            if os.path.exists(b): return b
-        return None
-
-    banner = obtener_banner_dinamico()
-    if banner:
-        st.image(banner, use_container_width=True)
-    
     # --- ACTIVACIÓN DE CARGA POST-LOGIN ---
     cargar_datos_sesion_usuario()
 
@@ -1788,7 +1764,7 @@ else:
 
 def renderizar_gestion_pedidos_central():
     st.title("📦 Centro de Gestión de Pedidos (Administración)")
-    st.info("Visualización y control de pedidos de todo el ecosistema CO5O.")
+    st.info("Visualización y control de pedidos.")
 
     try:
         gc = conectar_google_sheets()

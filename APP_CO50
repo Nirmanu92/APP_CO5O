@@ -35,9 +35,9 @@ from PIL import Image
 # --- CONFIGURACIÓN UI (DEBE SER LO PRIMERO) ---
 try:
     img_favicon = Image.open("ICONO.png")
-    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon=img_favicon, layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="Registro Maestro", page_icon=img_favicon, layout="wide", initial_sidebar_state="expanded")
 except:
-    st.set_page_config(page_title="CO5O - Registro Maestro", page_icon="ICONO.png", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="Registro Maestro", page_icon="ICONO.png", layout="wide", initial_sidebar_state="expanded")
 
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -1191,7 +1191,7 @@ def cargar_datos_sesion_usuario():
                 st.markdown(f"""
                 **Posibles soluciones:**
                 1. Verifique que el archivo existe en Drive.
-                2. Asegúrese de haber compartido el archivo con: `app-coso@manuel-hernandez.iam.gserviceaccount.com` como **Editor**.
+                2. Asegúrese de haber compartido el archivo con la cuenta de servicio autorizada como **Editor**.
                 3. El ID configurado es: `{sheet_id if sheet_id else 'No definido'}`
                 """)
                 st.stop()
@@ -1645,13 +1645,6 @@ if not st.session_state.autenticado:
     with col_l2:
         st.write("") 
         st.write("")
-        if os.path.exists("LOGOPURO.png"):
-            # Logo al 50% de ancho del contenedor central
-            _, mid_logo, _ = st.columns([1, 2, 1])
-            with mid_logo:
-                st.image("LOGOPURO.png", use_container_width=True)
-        else:
-            st.title("CO5O")
         
         with st.form("form_login"):
             st.markdown("<h3 style='text-align: center; color: #1F497D;'>Acceso al Sistema</h3>", unsafe_allow_html=True)
@@ -1679,23 +1672,6 @@ if not st.session_state.autenticado:
                 st.image("CONSULTINGLOGO.png", use_container_width=True)
     st.stop()
 else:
-    # --- MOSTRAR BANNER DINÁMICO ---
-    def obtener_banner_dinamico():
-        ahora = ahora_mexico()
-        hora = ahora.hour
-        if 6 <= hora < 12: prefijo = "DIA"
-        elif 12 <= hora < 19: prefijo = "TARDE"
-        else: prefijo = "NOCHE"
-        
-        # Intentar banner específico por horario, si no el general
-        for b in [f"BANNER_{prefijo}.png", "BANNER_TOP.png"]:
-            if os.path.exists(b): return b
-        return None
-
-    banner = obtener_banner_dinamico()
-    if banner:
-        st.image(banner, use_container_width=True)
-    
     # --- ACTIVACIÓN DE CARGA POST-LOGIN ---
     cargar_datos_sesion_usuario()
 
@@ -2120,7 +2096,7 @@ else:
                 st.markdown("### 🚚 Logística y Entrega")
                 l1, l2 = st.columns(2)
                 with l1:
-                    origen_ent = st.radio("Origen de Entrega:", ["Directo de Proveedor", "Desde Oficina CO5O"], horizontal=True)
+                    origen_ent = st.radio("Origen de Entrega:", ["Directo de Proveedor", "Desde Oficina"], horizontal=True)
                     metodo_ent = st.radio("Método de Envío:", ["Paquetería", "Ruta Interna / Chofer", "Recolección Cliente"], horizontal=True)
                 with l2:
                     dir_ent = st.text_area("Dirección Completa de Entrega:", value=st.session_state.get('entrega_val', ''))
@@ -2158,7 +2134,7 @@ else:
                                         # Fallback por nombre
                                         sh_pedidos = gc.open("PEDIDOS_Y_FACTURAS")
                                     except:
-                                        st.error("No se pudo abrir el archivo central de pedidos. Revisa el ID y los permisos para 'app-coso@manuel-hernandez.iam.gserviceaccount.com'")
+                                        st.error("No se pudo abrir el archivo central de pedidos. Revisa el ID y los permisos para la cuenta de servicio.")
                                         st.stop()
                                 
                                 ws_p = sh_pedidos.sheet1
