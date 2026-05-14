@@ -132,6 +132,28 @@ def obtener_directorio_ejecutivo_cached(sheet_id, usuario_id):
     except Exception as e:
         return None # Error de acceso o permisos
 
+@st.cache_data(ttl=300)
+def obtener_cotizaciones_personales_cached(sheet_id, usuario_id, nombre_ws):
+    """Lee cotizaciones (Resumen o Detalle) con caché."""
+    try:
+        gc = conectar_google_sheets()
+        sh = None
+        if sheet_id and len(str(sheet_id)) > 20:
+            try: sh = gc.open_by_key(sheet_id)
+            except: pass
+        if not sh:
+            u_clean = str(usuario_id).replace(".", "_")
+            for n in [f"COTIZACIONES_{usuario_id}", usuario_id, f"COTIZACIONES_{u_clean}", u_clean]:
+                try:
+                    sh = gc.open(n)
+                    break
+                except: continue
+        if not sh: return []
+        ws = sh.worksheet(nombre_ws)
+        return normalizar_registros(ws.get_all_records())
+    except:
+        return []
+
 # --- CARGA SÓLO USUARIOS PARA LOGIN ---
 def cargar_usuarios_login():
     """Carga la base de datos de usuarios autorizados."""
@@ -2093,11 +2115,15 @@ elif st.session_state.menu_actual == 'menu':
                 st.info("💡 Su cuenta no tiene una hoja de cotizaciones personales vinculada. Utilice los botones de navegación superiores para gestionar el sistema.")
         else:
             try:
-                ws_res = st.session_state.sh_personal.worksheet("COTIZACIONES_RESUMEN")
-                df_resumen = pd.DataFrame(ws_res.get_all_records())
+                # USO DE CACHÉ PARA EL DASHBOARD
+                s_id = st.session_state.sh_personal.id
+                u_id = st.session_state.usuario
+                
+                res_data = obtener_cotizaciones_personales_cached(s_id, u_id, "COTIZACIONES_RESUMEN")
+                df_resumen = pd.DataFrame(res_data)
             
-                ws_det = st.session_state.sh_personal.worksheet("COTIZACIONES_DETALLE")
-                df_det_all = pd.DataFrame(ws_det.get_all_records())
+                det_data = obtener_cotizaciones_personales_cached(s_id, u_id, "COTIZACIONES_DETALLE")
+                df_det_all = pd.DataFrame(det_data)
             
                 if not df_resumen.empty:
                     col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
