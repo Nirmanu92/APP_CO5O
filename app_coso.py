@@ -86,9 +86,16 @@ def conectar_google_sheets():
 
 # --- FUNCIONES DE LECTURA CON CACHÉ (PROTECCIÓN DE CUOTA API 429) ---
 def normalizar_registros(registros):
-    """Convierte todas las llaves de los registros a MAYÚSCULAS_Y_GUIONES_BAJOS."""
+    """Convierte todas las llaves de los registros a MAYÚSCULAS_Y_GUIONES_BAJOS (Robusto)."""
     if not registros: return []
-    return [{str(k).upper().replace(" ", "_"): v for k, v in r.items()} for r in registros]
+    import unicodedata
+    def limpiar_llave(txt):
+        if not txt: return ""
+        # Quitar acentos y normalizar
+        s = "".join(c for c in unicodedata.normalize('NFD', str(txt)) if unicodedata.category(c) != 'Mn')
+        return s.upper().strip().replace(" ", "_")
+    
+    return [{limpiar_llave(k): v for k, v in r.items()} for r in registros]
 
 @st.cache_data(ttl=600) # Guardar en memoria por 10 minutos
 def obtener_datos_maestros_cached(nombre_archivo, nombre_ws="sheet1"):
