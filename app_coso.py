@@ -1233,7 +1233,17 @@ def cargar_datos_sesion_usuario():
 
             # FALLBACK: Si no hay ID o falló, buscar por NOMBRE DE ARCHIVO
             if st.session_state.sh_personal is None:
-                nombres_intento = [f"COTIZACIONES_{st.session_state.usuario}", st.session_state.usuario]
+                # Intentar con puntos y con guiones bajos (Aylin.Perez vs Aylin_Perez)
+                u_id = str(st.session_state.usuario)
+                u_clean = u_id.replace(".", "_")
+                
+                nombres_intento = [
+                    f"COTIZACIONES_{u_id}", 
+                    u_id,
+                    f"COTIZACIONES_{u_clean}",
+                    u_clean
+                ]
+                
                 for n in nombres_intento:
                     try:
                         st.session_state.sh_personal = gc.open(n)

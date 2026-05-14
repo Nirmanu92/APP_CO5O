@@ -1176,11 +1176,14 @@ def cargar_datos_sesion_usuario():
                 if sheet_id and len(sheet_id) > 20:
                     st.session_state.sh_personal = gc.open_by_key(sheet_id)
                 else:
-                    # Intento por nombre si no hay ID configurado
-                    try:
-                        st.session_state.sh_personal = gc.open(f"COTIZACIONES_{st.session_state.usuario}")
-                    except:
-                        st.session_state.sh_personal = gc.open(st.session_state.usuario)
+                    # Intento por nombre si no hay ID configurado (Aylin.Perez vs Aylin_Perez)
+                    u_id = str(st.session_state.usuario)
+                    u_clean = u_id.replace(".", "_")
+                    for n in [f"COTIZACIONES_{u_id}", u_id, f"COTIZACIONES_{u_clean}", u_clean]:
+                        try:
+                            st.session_state.sh_personal = gc.open(n)
+                            break
+                        except: continue
                 
                 # DIAGNÓSTICO EXITOSO (Solo para depuración si el directorio falla)
                 # st.toast(f"Conectado a: {st.session_state.sh_personal.title}")
