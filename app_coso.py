@@ -559,33 +559,40 @@ def subir_archivo_a_drive(archivo_bytes, nombre_archivo, mimetype='application/p
         
         # 1. Intentar con el servicio del usuario (OAuth)
         service = obtener_drive_service()
+        oauth_error = None
         if service:
             try:
                 media = MediaIoBaseUpload(io.BytesIO(archivo_bytes), mimetype=mimetype, resumable=False)
-                file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+                file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink', supportsAllDrives=True).execute()
                 try:
-                    service.permissions().create(fileId=file.get('id'), body={'type': 'anyone', 'role': 'reader'}).execute()
+                    service.permissions().create(fileId=file.get('id'), body={'type': 'anyone', 'role': 'reader'}, supportsAllDrives=True).execute()
                 except: pass
                 return file.get('webViewLink')
             except Exception as e:
-                # Si falla (ej. sin permisos en la carpeta), silenciamos y probamos con cuenta de servicio
+                oauth_error = str(e)
+                # Si falla (ej. sin permisos en la carpeta), probamos con cuenta de servicio, pero guardamos el error
                 pass
 
         # 2. Fallback a cuenta de servicio
         sa_service = _obtener_sa_service()
         if sa_service:
             media = MediaIoBaseUpload(io.BytesIO(archivo_bytes), mimetype=mimetype, resumable=False)
-            file = sa_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+            file = sa_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink', supportsAllDrives=True).execute()
             try:
-                sa_service.permissions().create(fileId=file.get('id'), body={'type': 'anyone', 'role': 'reader'}).execute()
+                sa_service.permissions().create(fileId=file.get('id'), body={'type': 'anyone', 'role': 'reader'}, supportsAllDrives=True).execute()
             except: pass
             return file.get('webViewLink')
         else:
-            st.error("Error crítico: No hay credenciales válidas para subir archivos a Drive.")
+            err_msg = "Error crítico: No hay credenciales válidas."
+            if oauth_error: err_msg += f" Error del usuario: {oauth_error}"
+            st.error(err_msg)
             return ""
             
     except Exception as e:
-        st.error(f"Error al subir {nombre_archivo}: {e}")
+        msg = f"Error al subir {nombre_archivo}: {e}"
+        if 'oauth_error' in locals() and oauth_error:
+            msg += f" | Falla previa de OAuth del usuario: {oauth_error}"
+        st.error(msg)
         return ""
 
 def obtener_link_directo_drive(url):
