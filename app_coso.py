@@ -373,132 +373,153 @@ def generar_folio_automatico(cliente_rs, ejecutivo_id):
 st.markdown("""
     <style>
     /* Importar fuentes modernas y elegantes (Outfit para títulos, Inter para lectura) */
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif !important;
         -webkit-font-smoothing: antialiased;
-        color: #EDEDED;
+        color: #F8FAFC;
     }
 
     h1, h2, h3, .stMetric label {
         font-family: 'Outfit', sans-serif !important;
-        letter-spacing: -0.02em;
+        letter-spacing: -0.01em;
     }
 
-    /* Fondo Sobrio y Elegante (Midnight Slate) */
+    /* Fondo Vivo y Vibrante (Deep Space to Cosmic Violet/Blue) */
     .stApp {
-        background: linear-gradient(180deg, #09090b 0%, #111115 100%);
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
         background-attachment: fixed;
     }
     
-    /* Pestañas Minimalistas (Tipo Pill) */
+    /* Pestañas Neón Glassmorphism */
     [data-baseweb="tab-list"] {
         justify-content: center !important;
-        gap: 8px !important;
-        background-color: rgba(24, 24, 27, 0.4) !important;
-        padding: 6px !important;
-        border-radius: 14px;
-        backdrop-filter: blur(10px);
+        gap: 10px !important;
+        background: rgba(255, 255, 255, 0.03) !important;
+        padding: 8px !important;
+        border-radius: 16px;
+        backdrop-filter: blur(16px);
         margin-bottom: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
     }
     
     [data-baseweb="tab"] {
         min-width: 140px !important;
         text-align: center !important;
         font-size: 14px !important;
-        font-weight: 500 !important;
-        padding: 8px 16px !important;
-        color: #A1A1AA !important;
-        border-radius: 10px !important;
+        font-weight: 600 !important;
+        padding: 10px 20px !important;
+        color: #94A3B8 !important;
+        border-radius: 12px !important;
         background: transparent !important;
         border: none !important;
-        transition: all 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     [aria-selected="true"] {
         color: #FFFFFF !important;
-        background: rgba(255, 255, 255, 0.08) !important;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
+        background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%) !important;
+        box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
     }
 
-    /* Tarjetas de Métricas (Elegancia Glassmorphism) */
+    /* Tarjetas de Métricas (Glassmorphism Vibrante) */
     div[data-testid="metric-container"] {
-        background: linear-gradient(145deg, rgba(39, 39, 42, 0.3) 0%, rgba(24, 24, 27, 0.5) 100%) !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         padding: 24px !important;
-        border-radius: 16px !important;
-        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3) !important;
-        transition: all 0.3s ease;
-        backdrop-filter: blur(12px);
+        border-radius: 20px !important;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2) !important;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
     }
     
     div[data-testid="metric-container"]:hover {
-        transform: translateY(-3px);
-        background: linear-gradient(145deg, rgba(39, 39, 42, 0.5) 0%, rgba(24, 24, 27, 0.7) 100%) !important;
-        border-color: rgba(255, 255, 255, 0.1) !important;
-        box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.4) !important;
+        transform: translateY(-5px) scale(1.02);
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: rgba(139, 92, 246, 0.5) !important;
+        box-shadow: 0 15px 40px -5px rgba(139, 92, 246, 0.3) !important;
     }
 
-    /* Botones Cool & Sobrios */
+    /* Modificar estilo del valor de la métrica */
+    div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+        background: -webkit-linear-gradient(45deg, #60A5FA, #A78BFA);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 700;
+        font-size: 28px;
+    }
+
+    /* Botones Cool & Dinámicos */
     .stButton > button {
-        border-radius: 8px !important;
-        background: rgba(255, 255, 255, 0.03) !important;
-        color: #E4E4E7 !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        padding: 10px 24px !important;
-        font-weight: 500 !important;
+        border-radius: 12px !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #FFFFFF !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        padding: 12px 28px !important;
+        font-weight: 600 !important;
         font-size: 14px !important;
-        letter-spacing: 0.3px !important;
+        letter-spacing: 0.5px !important;
         transition: all 0.3s ease !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
+        backdrop-filter: blur(10px);
     }
 
     .stButton > button:hover {
-        background: rgba(255, 255, 255, 0.08) !important;
-        border-color: rgba(255, 255, 255, 0.2) !important;
+        background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%) !important;
+        border-color: transparent !important;
         color: #FFFFFF !important;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4) !important;
     }
 
-    /* Inputs y Selects */
+    /* Inputs y Selects Vivo */
     div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
-        background-color: rgba(24, 24, 27, 0.5) !important;
-        border-radius: 8px !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
-        color: #EDEDED !important;
-        transition: all 0.2s ease;
+        background-color: rgba(15, 23, 42, 0.6) !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #FFFFFF !important;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
     }
 
     textarea:focus, input:focus, div[data-baseweb="select"] > div:focus-within {
-        border-color: rgba(255, 255, 255, 0.2) !important;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
-        background-color: rgba(39, 39, 42, 0.6) !important;
+        border-color: #8B5CF6 !important;
+        box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3) !important;
+        background-color: rgba(30, 27, 75, 0.6) !important;
     }
 
-    /* Dataframes y expanders más integrados */
+    /* Dataframes y expanders más estilizados */
     [data-testid="stExpander"] {
-        background: rgba(24, 24, 27, 0.2) !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
-        border-radius: 12px !important;
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 16px !important;
+        backdrop-filter: blur(10px);
     }
 
-    /* Scrollbar minimalista y oscuro */
+    [data-testid="stDataFrame"] {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Scrollbar Neón */
     ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
     }
     ::-webkit-scrollbar-track {
         background: transparent;
     }
     ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(139, 92, 246, 0.3);
         border-radius: 10px;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.2);
+        background: rgba(139, 92, 246, 0.6);
+        box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
     }
 
     #MainMenu {visibility: hidden;}
@@ -2166,38 +2187,43 @@ elif st.session_state.menu_actual == 'menu':
                 det_data = obtener_cotizaciones_personales_cached(s_id, u_id, "COTIZACIONES_DETALLE")
                 df_det_all = pd.DataFrame(det_data)
             
-                if not df_resumen.empty:
+                if not df_resumen.empty and len(df_resumen.columns) > 0:
                     col_folio = 'FOLIO' if 'FOLIO' in df_resumen.columns else df_resumen.columns[0]
-                    col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else df_resumen.columns[6])
+                    col_cliente = 'CLIENTE' if 'CLIENTE' in df_resumen.columns else ('RAZON_SOCIAL' if 'RAZON_SOCIAL' in df_resumen.columns else (df_resumen.columns[6] if len(df_resumen.columns) > 6 else df_resumen.columns[0]))
                     
-                    # Normalizar nombres de columnas del detalle para el cálculo
-                    df_det_norm = df_det_all.copy()
-                    df_det_norm.columns = [c.upper().replace(" ", "_") for c in df_det_norm.columns]
-                    col_folio_det = df_det_norm.columns[0]
+                    df_stats = df_resumen.copy()
+                    df_stats['MONTO_TOTAL'] = 0.0
+                    df_stats['UTILIDAD_TOTAL'] = 0.0
 
-                    # Identificar columnas de monto y utilidad de forma robusta
-                    col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL" in c or "PFACTURA" in c), df_det_norm.columns[-3])
-                    # Búsqueda muy flexible para Utilidad
-                    col_util_src = next((c for c in df_det_norm.columns if "UTILIDAD" in c or "UTIL_$" in c), None)
-                    
-                    # Si no encuentra por nombre, usar el índice típico de la columna T (índice 19)
-                    if not col_util_src:
-                        col_util_src = df_det_norm.columns[19] if len(df_det_norm.columns) > 19 else df_det_norm.columns[-1]
+                    if not df_det_all.empty and len(df_det_all.columns) > 0:
+                        # Normalizar nombres de columnas del detalle para el cálculo
+                        df_det_norm = df_det_all.copy()
+                        df_det_norm.columns = [c.upper().replace(" ", "_") for c in df_det_norm.columns]
+                        col_folio_det = df_det_norm.columns[0]
 
-                    def clean_num(x):
-                        if isinstance(x, str):
-                            # Eliminar $, comas y espacios para convertir a número puro
-                            limpio = x.replace("$", "").replace(",", "").replace(" ", "").strip()
-                            return pd.to_numeric(limpio, errors='coerce')
-                        return pd.to_numeric(x, errors='coerce')
+                        # Identificar columnas de monto y utilidad de forma robusta
+                        col_monto_src = next((c for c in df_det_norm.columns if "VENTA_TOTAL" in c or "PFACTURA" in c), df_det_norm.columns[-3] if len(df_det_norm.columns) > 3 else col_folio_det)
+                        # Búsqueda muy flexible para Utilidad
+                        col_util_src = next((c for c in df_det_norm.columns if "UTILIDAD" in c or "UTIL_$" in c), None)
+                        
+                        # Si no encuentra por nombre, usar el índice típico de la columna T (índice 19)
+                        if not col_util_src:
+                            col_util_src = df_det_norm.columns[19] if len(df_det_norm.columns) > 19 else (df_det_norm.columns[-1] if len(df_det_norm.columns) > 0 else col_folio_det)
 
-                    df_montos_util = df_det_norm.groupby(col_folio_det).agg({
-                        col_monto_src: lambda x: x.apply(clean_num).sum(),
-                        col_util_src: lambda x: x.apply(clean_num).sum()
-                    }).reset_index()
-                    df_montos_util.columns = [col_folio, 'MONTO_TOTAL', 'UTILIDAD_TOTAL']
+                        def clean_num(x):
+                            if isinstance(x, str):
+                                # Eliminar $, comas y espacios para convertir a número puro
+                                limpio = x.replace("$", "").replace(",", "").replace(" ", "").strip()
+                                return pd.to_numeric(limpio, errors='coerce')
+                            return pd.to_numeric(x, errors='coerce')
 
-                    df_stats = pd.merge(df_resumen, df_montos_util, on=col_folio, how='left').fillna(0)
+                        df_montos_util = df_det_norm.groupby(col_folio_det).agg({
+                            col_monto_src: lambda x: x.apply(clean_num).sum(),
+                            col_util_src: lambda x: x.apply(clean_num).sum()
+                        }).reset_index()
+                        df_montos_util.columns = [col_folio, 'MONTO_TOTAL', 'UTILIDAD_TOTAL']
+
+                        df_stats = pd.merge(df_resumen, df_montos_util, on=col_folio, how='left').fillna(0)
 
                     # 2. Definir universos
                     estatus_cerrados = ["100% Ganada", "0% Cancelada", "100% Pedido"]
@@ -2306,7 +2332,12 @@ elif st.session_state.menu_actual == 'menu':
                     with m3: st.metric("Total Ganado", f"$ {monto_ganado:,.0f}", help="Suma de montos de proyectos al 100%")
 
                     # Encontrar Proveedor más usado
-                    prov_top = df_det_all['PROVEEDOR'].mode().iloc[0] if not df_det_all.empty and 'PROVEEDOR' in df_det_all.columns else "N/A"
+                    if not df_det_all.empty and 'PROVEEDOR' in df_det_all.columns:
+                        modas = df_det_all['PROVEEDOR'].mode()
+                        prov_top = modas.iloc[0] if not modas.empty else "N/A"
+                    else:
+                        prov_top = "N/A"
+                        
                     with m4: st.metric("Proveedor Estrella", prov_top)
 
                     st.write("")
