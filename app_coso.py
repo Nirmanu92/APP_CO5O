@@ -483,52 +483,61 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 def subir_archivo_a_drive(archivo_bytes, nombre_archivo, mimetype='application/pdf'):
-    try:
-        service = obtener_drive_service()
-        
-        # --- FALLBACK: SI NO HAY SERVICE OAUTH, USAR CUENTA DE SERVICIO ---
-        if not service:
-            scope = ["https://www.googleapis.com/auth/drive"]
-            if "gcp_service_account" in st.secrets:
-                try:
-                    sec = st.secrets["gcp_service_account"]
-                    creds_info = dict(sec) if not isinstance(sec, str) else json.loads(sec)
-                    if "private_key" in creds_info:
-                        pk = str(creds_info["private_key"])
-                        pk = pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
-                        pk = pk.replace("\\n", "").replace("\n", "").replace(" ", "").strip()
-                        pk_clean = "-----BEGIN PRIVATE KEY-----\n"
-                        for i in range(0, len(pk), 64): pk_clean += pk[i:i+64] + "\n"
-                        pk_clean += "-----END PRIVATE KEY-----\n"
-                        creds_info["private_key"] = pk_clean
-                    creds = Credentials.from_service_account_info(creds_info, scopes=scope)
-                except:
-                    creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
-            else:
+    def _obtener_sa_service():
+        scope = ["https://www.googleapis.com/auth/drive"]
+        if "gcp_service_account" in st.secrets:
+            try:
+                sec = st.secrets["gcp_service_account"]
+                creds_info = dict(sec) if not isinstance(sec, str) else json.loads(sec)
+                if "private_key" in creds_info:
+                    pk = str(creds_info["private_key"])
+                    pk = pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
+                    pk = pk.replace("\\n", "").replace("\n", "").replace(" ", "").strip()
+                    pk_clean = "-----BEGIN PRIVATE KEY-----\n"
+                    for i in range(0, len(pk), 64): pk_clean += pk[i:i+64] + "\n"
+                    pk_clean += "-----END PRIVATE KEY-----\n"
+                    creds_info["private_key"] = pk_clean
+                creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+                return build('drive', 'v3', credentials=creds)
+            except: pass
+        if os.path.exists(FILE_JSON_SERVICE):
+            try:
                 creds = Credentials.from_service_account_file(FILE_JSON_SERVICE, scopes=scope)
-            service = build('drive', 'v3', credentials=creds)
+                return build('drive', 'v3', credentials=creds)
+            except: pass
+        return None
 
-        # Seleccionar ID de carpeta destino según tipo
+    try:
         folder_id = ID_CARPETA_IMAGENES if "image" in mimetype else ID_CARPETA_COTIZACIONES
-        
         file_metadata = {'name': nombre_archivo, 'parents': [folder_id]}
-        media = MediaIoBaseUpload(io.BytesIO(archivo_bytes), mimetype=mimetype, resumable=False)
         
-        file = service.files().create(
-            body=file_metadata, 
-            media_body=media, 
-            fields='id, webViewLink'
-        ).execute()
-        
-        # Intentar dar permisos de lectura a cualquiera con el link
-        try:
-            service.permissions().create(
-                fileId=file.get('id'), 
-                body={'type': 'anyone', 'role': 'reader'}
-            ).execute()
-        except: pass
-        
-        return file.get('webViewLink')
+        # 1. Intentar con el servicio del usuario (OAuth)
+        service = obtener_drive_service()
+        if service:
+            try:
+                media = MediaIoBaseUpload(io.BytesIO(archivo_bytes), mimetype=mimetype, resumable=False)
+                file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+                try:
+                    service.permissions().create(fileId=file.get('id'), body={'type': 'anyone', 'role': 'reader'}).execute()
+                except: pass
+                return file.get('webViewLink')
+            except Exception as e:
+                # Si falla (ej. sin permisos en la carpeta), silenciamos y probamos con cuenta de servicio
+                pass
+
+        # 2. Fallback a cuenta de servicio
+        sa_service = _obtener_sa_service()
+        if sa_service:
+            media = MediaIoBaseUpload(io.BytesIO(archivo_bytes), mimetype=mimetype, resumable=False)
+            file = sa_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+            try:
+                sa_service.permissions().create(fileId=file.get('id'), body={'type': 'anyone', 'role': 'reader'}).execute()
+            except: pass
+            return file.get('webViewLink')
+        else:
+            st.error("Error crítico: No hay credenciales válidas para subir archivos a Drive.")
+            return ""
+            
     except Exception as e:
         st.error(f"Error al subir {nombre_archivo}: {e}")
         return ""
