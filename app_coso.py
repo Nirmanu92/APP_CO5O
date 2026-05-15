@@ -1613,6 +1613,11 @@ def cargar_cotizacion_para_editar(row, df_resumen):
             if "Util %" in df_edit.columns:
                 df_edit["Util %"] = pd.to_numeric(df_edit["Util %"], errors='coerce').fillna(0)
                 if df_edit["Util %"].max() <= 1.0: df_edit["Util %"] = (df_edit["Util %"] * 100).round(1)
+
+            # Forzar tipos de datos de texto para evitar bloqueos del editor
+            for col in ["Concepto", "Descripción", "SKU", "Folio Prov", "Link"]:
+                if col in df_edit.columns: df_edit[col] = df_edit[col].astype(str).replace('nan', '').replace('None', '')
+            
             
             st.session_state.df_partidas = df_edit[cols_necesarias]
     except Exception as e:
@@ -2987,13 +2992,17 @@ elif st.session_state.menu_actual == 'nuevo':
         mapa_iva = {p['PROVEEDOR']: (1.0 if p.get('SUMA_IVA', 'SI') == 'SI' else 1.16) for p in db_prov}
 
         if 'df_partidas' not in st.session_state:
-            st.session_state.df_partidas = pd.DataFrame([{
+            df_init = pd.DataFrame([{
                 "Tipo": "PARTIDA", "Moneda": "MXN", "Concepto": "", "Descripción": "", "Pzas": 1, "SKU": "",
                 "PM": 0.0, "Proveedor": lista_prov[0] if lista_prov else "", 
                 "Folio Prov": "", "Link": "",
                 "Envio Prov": 0.0, "Envio Sec": 0.0, "Util %": 15.0,
                 "Financiamiento": "Sin Financiera", "Financiera": "N/A"
             }])
+            # Forzar tipos de datos para asegurar que el editor permita edición en usuarios nuevos
+            for col in ["Concepto", "Descripción", "SKU", "Folio Prov", "Link"]:
+                df_init[col] = df_init[col].astype(str)
+            st.session_state.df_partidas = df_init
 
         config_editor = {
             "Tipo": st.column_config.SelectboxColumn("Tipo", options=["PARTIDA", "COMPONENTE"], required=True),
