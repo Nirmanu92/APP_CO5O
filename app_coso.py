@@ -304,8 +304,14 @@ def obtener_drive_service():
     try:
         # Buscar token en los datos cargados del usuario
         datos_user = next((u for u in st.session_state.usuarios_db if u['USUARIO'] == usuario), None)
+        if not datos_user:
+            st.error(f"DEBUG OAUTH: Usuario {usuario} no encontrado en la DB.")
+            return None
+            
         token_json = datos_user.get('TOKEN_DRIVE')
-        
+        if not token_json or str(token_json).strip() == "":
+            return None # Esto es normal si no se ha vinculado
+            
         if token_json:
             token_data = json.loads(token_json)
             # Reconstruir credenciales
@@ -322,15 +328,17 @@ def obtener_drive_service():
                     
                     guardar_token_drive(usuario, new_token_data)
                 except Exception as e:
-                    # Si falla el refresh (ej. invalid_grant), devolvemos None para forzar re-vinculación
+                    st.error(f"⚠️ Tu conexión con Drive caducó o fue revocada. Ve a Inicio y vuelve a 'VINCULAR MI GOOGLE DRIVE'. (Error técnico: {e})")
                     return None
             
-            # Si el token sigue expirado y no hay refresh_token, o falló lo anterior
+            # Si el token sigue expirado y no hay refresh_token
             if creds and creds.expired and not creds.refresh_token:
+                st.error("⚠️ Token de Drive sin Refresh Token. Ve a Inicio y vuelve a 'VINCULAR MI GOOGLE DRIVE'.")
                 return None
                 
             return build('drive', 'v3', credentials=creds)
     except Exception as e:
+        st.error(f"DEBUG OAUTH: Error general reconstruyendo credenciales: {e}")
         return None
     return None
 
