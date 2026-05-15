@@ -3001,6 +3001,7 @@ elif st.session_state.menu_actual == 'nuevo':
             "Descripción": st.column_config.TextColumn("Descripción", width="medium", required=True),
             "PM": st.column_config.NumberColumn("P. Mayorista", format="$ %.2f"),
             "Proveedor": st.column_config.SelectboxColumn("Proveedor", options=lista_prov),
+            "Link": st.column_config.TextColumn("Link de Referencia", width="medium"),
             "Util %": st.column_config.NumberColumn("Margen %", format="%.1f%%"),
             "Pzas": st.column_config.NumberColumn("Cant", min_value=1),
             "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True),
