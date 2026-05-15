@@ -228,30 +228,44 @@ def procesar_callback_oauth():
             st.error(f"Error técnico en vinculación: {e}")
 
 def guardar_token_drive(usuario, token_data):
-    """Guarda el token de Drive en Google Sheets y limpia la caché."""
-    try:
-        gc = conectar_google_sheets()
-        sh = gc.open("CONTROL_USUARIOS")
-        ws_users = sh.sheet1
-        usuarios_list = ws_users.col_values(1)
-        
-        if usuario in usuarios_list:
-            fila_idx = usuarios_list.index(usuario) + 1
-            headers = ws_users.row_values(1)
-            if "TOKEN_DRIVE" not in headers:
-                ws_users.update_cell(1, len(headers) + 1, "TOKEN_DRIVE")
-                col_idx = len(headers) + 1
-            else:
-                col_idx = headers.index("TOKEN_DRIVE") + 1
+    """Guarda el token de Drive en Google Sheets y limpia la caché (con manejo de reintentos)."""
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            gc = conectar_google_sheets()
+            sh = gc.open("CONTROL_USUARIOS")
+            ws_users = sh.sheet1
             
-            ws_users.update_cell(fila_idx, col_idx, json.dumps(token_data))
-            # LIMPIAR CACHÉ para que la app lea los nuevos datos inmediatamente
-            obtener_datos_maestros_cached.clear()
-            if 'usuarios_db' in st.session_state:
-                del st.session_state.usuarios_db
-            return True
-    except Exception as e:
-        st.error(f"Error al guardar token: {e}")
+            # Usar un solo request de lectura para ahorrar cuota
+            all_values = ws_users.get_all_values()
+            if not all_values:
+                return False
+                
+            headers = all_values[0]
+            usuarios_list = [row[0] if len(row) > 0 else "" for row in all_values]
+            
+            if usuario in usuarios_list:
+                fila_idx = usuarios_list.index(usuario) + 1
+                if "TOKEN_DRIVE" not in headers:
+                    col_idx = len(headers) + 1
+                    ws_users.update_cell(1, col_idx, "TOKEN_DRIVE")
+                else:
+                    col_idx = headers.index("TOKEN_DRIVE") + 1
+                
+                # Update cell (escritura)
+                ws_users.update_cell(fila_idx, col_idx, json.dumps(token_data))
+                
+                # LIMPIAR CACHÉ para que la app lea los nuevos datos inmediatamente
+                obtener_datos_maestros_cached.clear()
+                if 'usuarios_db' in st.session_state:
+                    del st.session_state.usuarios_db
+                return True
+        except Exception as e:
+            if "429" in str(e) and attempt < max_retries - 1:
+                time.sleep(3 * (attempt + 1)) # Backoff de 3, 6 segundos
+                continue
+            st.error(f"Error al guardar token tras {attempt+1} intentos: {e}")
+            break
     return False
 
 def autenticar_usuario_oauth():
