@@ -1864,12 +1864,11 @@ else:
                         del st.session_state[key]
                     st.rerun()
 
-        # Solo pedir vinculación de Drive a EJECUTIVOS
-        if st.session_state.rol == "EJECUTIVO":
-            if not obtener_drive_service():
-                st.warning("⚠️ CONEXIÓN DE DRIVE PENDIENTE")
-                autenticar_usuario_oauth()
-                st.divider()
+        # Pedir vinculación de Drive si no hay servicio disponible (token caducado o sin vincular)
+        if not obtener_drive_service():
+            st.warning("⚠️ CONEXIÓN DE DRIVE PENDIENTE O CADUCADA")
+            autenticar_usuario_oauth()
+            st.divider()
 
 def renderizar_gestion_pedidos_central():
     st.title("📦 Centro de Gestión de Pedidos (Administración)")
