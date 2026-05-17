@@ -2993,7 +2993,7 @@ elif st.session_state.menu_actual == 'nuevo':
 
         if 'df_partidas' not in st.session_state:
             df_init = pd.DataFrame([{
-                "Tipo": "PARTIDA", "Moneda": "MXN", "Concepto": "", "Descripción": "", "Pzas": 1, "SKU": "",
+                "Tipo": "PARTIDA", "Moneda": "MXN", "Concepto": "", "Descripción": "", "Pzas": 1.0, "SKU": "",
                 "PM": 0.0, "Proveedor": lista_prov[0] if lista_prov else "", 
                 "Folio Prov": "", "Link": "",
                 "Envio Prov": 0.0, "Envio Sec": 0.0, "Util %": 15.0,
@@ -3008,11 +3008,13 @@ elif st.session_state.menu_actual == 'nuevo':
             "Tipo": st.column_config.SelectboxColumn("Tipo", options=["PARTIDA", "COMPONENTE"], required=True),
             "Moneda": st.column_config.SelectboxColumn("Moneda", options=["MXN", "USD"], required=True),
             "Descripción": st.column_config.TextColumn("Descripción", width="medium", required=True),
-            "PM": st.column_config.NumberColumn("P. Mayorista", format="$ %.2f"),
+            "PM": st.column_config.NumberColumn("P. Mayorista", format="$ %.2f", step=0.01),
+            "Envio Prov": st.column_config.NumberColumn("Envío Prov", format="$ %.2f", step=0.01),
+            "Envio Sec": st.column_config.NumberColumn("Envío Sec", format="$ %.2f", step=0.01),
             "Proveedor": st.column_config.SelectboxColumn("Proveedor", options=lista_prov),
             "Link": st.column_config.TextColumn("Link de Referencia", width="medium"),
-            "Util %": st.column_config.NumberColumn("Margen %", format="%.1f%%"),
-            "Pzas": st.column_config.NumberColumn("Cant", min_value=1),
+            "Util %": st.column_config.NumberColumn("Margen %", format="%.2f%%", step=0.01),
+            "Pzas": st.column_config.NumberColumn("Cant", min_value=0.01, step=0.01),
             "Financiamiento": st.column_config.SelectboxColumn("Financiamiento", options=["Sin Financiera", "Arrendamiento", "Financiamiento"], required=True),
             "Financiera": st.column_config.SelectboxColumn("Financiera", options=["N/A", "DFS", "HPE", "Otro"], required=True),
         }
